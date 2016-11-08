@@ -1,0 +1,15 @@
+AUTH0_API_KEY = 'api-token'
+AUTH0_API_URL = 'https://auth-dev.mozilla.auth0.com/api/v2'
+AUTH0_CONNECTION = 'LDAP-Connection'
+LDAP_USER = 'bind-user-dn'
+LDAP_PASS = 'bind-user-password'
+LDAP_HOST = '127.0.0.1'
+USE_PROXY = False
+PROXIES = {
+    "http": "http://proxy.dmz.scl3.mozilla.com:3128",
+    "https": "http://proxy.dmz.scl3.mozilla.com:3128",
+}
+# exceptions won't be blocked, useful for system accounts
+EXCLUSION_LIST = [
+    'example@mozilla.com',
+]
