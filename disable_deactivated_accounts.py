@@ -1,17 +1,24 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 import sys
 import optparse
 import requests
 import ldap
 import json
 
-from auth0_api_settings import AUTH0_API_KEY, AUTH0_API_URL, AUTH0_CONNECTION, LDAP_HOST,\
-    LDAP_USER, LDAP_PASS, EXCLUSION_LIST, USE_PROXY, PROXIES
+#from auth0_api_settings import AUTH0_API_KEY, AUTH0_API_URL, AUTH0_CONNECTION, LDAP_HOST,\
+#    LDAP_USER, LDAP_PASS, EXCLUSION_LIST, USE_PROXY, PROXIES
+
+with open('auth0_api_settings.json') as fd:
+    config = json.load(fd)
+    auth0_config = config['auth0_config']
+    ldap_config = config['ldap_config']
+    proxy_config = config['proxy_config']
+    disable_deactivated_users_config = config['disable_deactivated_users_config']
 
 # function to build headers that'll be used by all API calls
 def build_headers():
     headers = {}
-    headers['Authorization'] = 'Bearer %s' % AUTH0_API_KEY
+    headers['Authorization'] = 'Bearer %s' % auth0_config['auth0_api_key']
     headers['Content-Type'] = "application/json"
     headers['Accept'] = "application/json"
     return headers
@@ -21,16 +28,16 @@ def build_headers():
 def list_all_users():
     should_return = False
     return_list = []
-    fetch_url = "%s/users" % (AUTH0_API_URL)
-    payload = {'connection': "%s" % AUTH0_CONNECTION, 'fields': 'user_id,email,blocked', 'include_fields': 'true'}
+    fetch_url = "%s/users" % auth0_config['auth0_api_url']
+    payload = {'connection': "%s" % auth0_config['auth0_connection'], 'fields': 'user_id,email,blocked', 'include_fields': 'true'}
     while (should_return is False):
         prev_url = fetch_url
-        if USE_PROXY is True:
+        if proxy_config['use_proxy'] is True:
             resp = requests.get(
                 fetch_url,
                 headers=build_headers(),
                 params=payload,
-                proxies=PROXIES
+                proxies=proxy_config['proxies']
             )
         else:
             resp = requests.get(fetch_url, headers=build_headers(), params=payload)
@@ -69,10 +76,10 @@ def get_ldap_user_by_mail(conn, mail):
 # this function does the actual blocking of the user in auth0
 def disable_user(user_id):
     deactive_url = "users/%s" % user_id
-    url = "%s/%s" % (AUTH0_API_URL, deactive_url)
+    url = "%s/%s" % (auth0_config['auth0_api_url'], deactive_url)
     body = '{"blocked":true}'
-    if USE_PROXY is True:
-        requests.patch(url, headers=build_headers(), data=body, proxies=PROXIES)
+    if proxy_config['use_proxy'] is True:
+        requests.patch(url, headers=build_headers(), data=body, proxies=proxy_config['proxies'])
     else:
         requests.patch(url, headers=build_headers(), data=body)
     return True
@@ -93,8 +100,8 @@ def main(prog_args=None):
 
     active_users = list_all_active_users()
 
-    ldap_conn = ldap.initialize('ldap://%s' % LDAP_HOST)
-    ldap_conn.simple_bind_s(LDAP_USER, LDAP_PASS)
+    ldap_conn = ldap.initialize('ldap://%s' % ldap_config['ldap_host'])
+    ldap_conn.simple_bind_s(ldap_config['ldap_user'], ldap_config['ldap_pass'])
 
     for user in active_users:
         try:
@@ -110,7 +117,7 @@ def main(prog_args=None):
         if id and email:
             active_ldap_account = get_ldap_user_by_mail(ldap_conn, email)
             if active_ldap_account is not True\
-                    and email not in EXCLUSION_LIST:
+                    and email not in disable_deactivated_accounts_config['exclusion_list']:
                 print "Disabling Auth0 for %s" % email
                 if not opt.debug:
                     disable_user(id)

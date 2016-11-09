@@ -90,3 +90,4 @@ ENV/
 
 # config files with secrets
 auth0_api_settings.py
+auth0_api_settings.json

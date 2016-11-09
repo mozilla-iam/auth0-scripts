@@ -1,0 +1,24 @@
+{
+    "auth0_config": {
+        "auth0_api_key": "",
+        "auth0_api_url": "",
+        "auth0_connection": "",
+    }
+    "ldap_config": {
+        "ldap_user": "",
+        "ldap_pass": "",
+        "ldap_host": "",
+    }
+    "proxy_config": {
+        "use_proxy": "",
+        "proxies": {
+            "http": "http://proxy.dmz.scl3.mozilla.com:3128",
+            "https": "http://proxy.dmz.scl3.mozilla.com:3128",
+        }
+    }
+    "disable_deactivated_accounts_config": {
+        "exclusion_list": {
+            'example@mozilla.com',
+        }
+    }
+}
