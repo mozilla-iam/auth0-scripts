@@ -13,7 +13,7 @@ with open('auth0_api_settings.json') as fd:
     auth0_config = config['auth0_config']
     ldap_config = config['ldap_config']
     proxy_config = config['proxy_config']
-    disable_deactivated_users_config = config['disable_deactivated_users_config']
+    disable_deactivated_accounts_config = config['disable_deactivated_accounts_config']
 
 # function to build headers that'll be used by all API calls
 def build_headers():
@@ -56,7 +56,10 @@ def list_all_users():
 # active user here is defined as not being currently blocked
 def list_all_active_users():
     users = list_all_users()
-    return [user for user in users if user[u'blocked'] != True]
+
+    return [user for user in users if u'blocked' not in user or user[u'blocked'] != True]
+
+#    return [user for user in users if user[u'blocked'] != True or user[u'blocked'] not in user]
 
 
 # this function returns the DN of the user that matches the given e-mail address
@@ -105,12 +108,12 @@ def main(prog_args=None):
 
     for user in active_users:
         try:
-            email = user['email']
+            email = user[u'email']
         except (KeyError):
             print "Cannot get email attribute for user"
 
         try:
-            id = user['user_id']
+            id = user[u'user_id']
         except (KeyError):
             print "Cannot get id attribute for user"
 
