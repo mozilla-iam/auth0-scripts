@@ -5,9 +5,6 @@ import requests
 import ldap
 import json
 
-#from auth0_api_settings import AUTH0_API_KEY, AUTH0_API_URL, AUTH0_CONNECTION, LDAP_HOST,\
-#    LDAP_USER, LDAP_PASS, EXCLUSION_LIST, USE_PROXY, PROXIES
-
 with open('auth0_api_settings.json') as fd:
     config = json.load(fd)
     auth0_config = config['auth0_config']
@@ -58,9 +55,6 @@ def list_all_active_users():
     users = list_all_users()
 
     return [user for user in users if u'blocked' not in user or user[u'blocked'] != True]
-
-#    return [user for user in users if user[u'blocked'] != True or user[u'blocked'] not in user]
-
 
 # this function returns the DN of the user that matches the given e-mail address
 def get_ldap_user_by_mail(conn, mail):
