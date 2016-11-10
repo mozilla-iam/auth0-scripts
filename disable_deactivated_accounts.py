@@ -36,9 +36,14 @@ def list_all_users():
                 params=payload,
                 proxies=proxy_config['proxies']
             )
+            if resp.status_code != 200:
+                print "Error while getting users from Auth0"
+                print "%s %s" % (resp.status_code, resp.text)
         else:
             resp = requests.get(fetch_url, headers=build_headers(), params=payload)
-            req = resp.request
+            if resp.status_code != 200:
+                print "Error while getting users from Auth0"
+                print "%s %s" % (resp.status_code, resp.text)
         return_list += resp.json()
         try:
             fetch_url = resp.links['next']['url']
@@ -53,14 +58,23 @@ def list_all_users():
 # active user here is defined as not being currently blocked
 def list_all_active_users():
     users = list_all_users()
+    ret_users = []
+    for user in users:
+    	if u'blocked' not in user:
+            ret_users.append(user)
+        elif user[u'blocked'] is not True:
+            ret_users.append(user)
+    return ret_users
 
-    return [user for user in users if u'blocked' not in user or user[u'blocked'] != True]
+#    return [user for user in users if u'blocked' not in user or user[u'blocked'] != True]
 
 # this function returns the DN of the user that matches the given e-mail address
 def get_ldap_user_by_mail(conn, mail):
+    mail_query = '(%s=%s)' % (ldap_config['mail_attribute'], mail)
+    disabled_query = ldap_config['disabled_query']
     member = conn.search_s('dc=mozilla',
                            ldap.SCOPE_SUBTREE,
-                           '(&(mail=%s)(!(employeeType=DISABLED)))' % mail,
+                           '(&%s(!(%s)))' % (mail_query, disabled_query),
                            attrlist=['mail'])
     try:
         if member[0][1]['mail'][0]:
@@ -76,9 +90,15 @@ def disable_user(user_id):
     url = "%s/%s" % (auth0_config['auth0_api_url'], deactive_url)
     body = '{"blocked":true}'
     if proxy_config['use_proxy'] is True:
-        requests.patch(url, headers=build_headers(), data=body, proxies=proxy_config['proxies'])
+        resp = requests.patch(url, headers=build_headers(), data=body, proxies=proxy_config['proxies'])
+        if resp.status_code != 200:
+            print "Error while blocking %:" % user_id
+            print "%s %s" % (resp.status_code, resp.text)
     else:
-        requests.patch(url, headers=build_headers(), data=body)
+        resp = requests.patch(url, headers=build_headers(), data=body)
+        if resp.status_code != 200:
+            print "Error while blocking %:" % user_id
+            print "%s %s" % (resp.status_code, resp.text)
     return True
 
 

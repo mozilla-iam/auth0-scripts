@@ -7,7 +7,9 @@
     "ldap_config": {
         "ldap_user": "",
         "ldap_pass": "",
-        "ldap_host": ""
+        "ldap_host": "",
+        "mail_attribute": "",
+        "disabled_query": "employeeType=DISABLED"
     },
     "proxy_config": {
         "use_proxy": "",
