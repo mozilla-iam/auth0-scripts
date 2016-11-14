@@ -26,7 +26,6 @@ def list_all_users():
     should_return = False
     return_list = []
     fetch_url = "%s/users" % auth0_config['auth0_api_url']
-#    payload = {'connection': "%s" % auth0_config['auth0_connection'], 'fields': 'user_id,email,blocked', 'include_fields': 'true'}
     payload = {'fields': 'identities,user_id,email,blocked', 'include_fields': 'true'}
     while (should_return is False):
         prev_url = fetch_url
