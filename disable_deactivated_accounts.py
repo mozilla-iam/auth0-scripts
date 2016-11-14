@@ -77,13 +77,19 @@ def get_ldap_user_by_mail(conn, mail):
                            ldap.SCOPE_SUBTREE,
                            '(&%s(!(%s)))' % (mail_query, disabled_query),
                            attrlist=['mail'])
-    try:
-        if member[0][1]['mail'][0]:
-            return True
-        else:
-            return False
-    except (IndexError, KeyError):
-        return None
+    if len(member) == 1:
+        try:
+            if member[0][1]['mail'][0]:
+                return True
+            else:
+                return False
+        except (IndexError, KeyError):
+            return None
+    elif len(members) == 0:
+        return False
+    else:
+        print "Something went wrong and we got %i entries and expected 0 or 1" % len(member)
+        sys.exit(2)
 
 # this function does the actual blocking of the user in auth0
 def disable_user(user_id):
