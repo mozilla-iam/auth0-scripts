@@ -68,12 +68,10 @@ def list_active_users(users):
 #    return [user for user in users if u'blocked' not in user or user[u'blocked'] != True]
 
 # this function returns the DN of the user that matches the given e-mail address
-def get_ldap_user_by_mail(conn, mail, attribute_type):
-    if attribute_type is "canonical":
-        mail_attribute = ldap_config['mail_attribute']
-    elif attribute_type is "alias":
-        mail_attribute = ldap_config['alias_attribute']
-    mail_query = '(%s=%s)' % (mail_attribute, mail)
+def get_ldap_user_by_mail(conn, mail):
+    mail_attribute = ldap_config['mail_attribute']
+    alias_attribute = ldap_config['alias_attribute']
+    mail_query = '(|(%s=%s)(%s=%s))' % (mail_attribute, mail, alias_attribute, mail)
     disabled_query = ldap_config['disabled_query']
     member = conn.search_s('dc=mozilla',
                            ldap.SCOPE_SUBTREE,
@@ -139,8 +137,7 @@ def main(prog_args=None):
         if id and email:
             for domain in ldap_config['ldap_domains']:
                 if domain in email:
-                    if get_ldap_user_by_mail(ldap_conn, email, "canonical") is not True\
-                            and get_ldap_user_by_mail(ldap_conn, email, "alias") is not True\
+                    if get_ldap_user_by_mail(ldap_conn, email) is not True\
                             and email not in disable_deactivated_accounts_config['exclusion_list']:
                         print "Disabling Auth0 for %s" % email
                         if not opt.debug:
