@@ -84,7 +84,7 @@ def get_ldap_user_by_mail(conn, mail):
                 return False
         except (IndexError, KeyError):
             return None
-    elif len(members) == 0:
+    elif len(member) == 0:
         return False
     else:
         print "Something went wrong and we got %i entries and expected 0 or 1" % len(member)
