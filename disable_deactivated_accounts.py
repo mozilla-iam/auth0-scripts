@@ -135,18 +135,18 @@ def main(prog_args=None):
             print "Cannot get email attribute for user"
 
         try:
-            id = user[u'user_id']
+            identity = user[u'user_id']
         except (KeyError):
             print "Cannot get id attribute for user"
 
-        if id and email:
+        if identity and email:
             for domain in ldap_config['ldap_domains']:
                 if domain in email:
                     if get_ldap_user_by_mail(ldap_conn, email) is not True\
                             and email not in disable_deactivated_accounts_config['exclusion_list']:
                         print "Disabling Auth0 for %s" % email
                         if not opt.debug:
-                            disable_user(id)
+                            disable_user(identity)
 
 
 if __name__ == "__main__":
