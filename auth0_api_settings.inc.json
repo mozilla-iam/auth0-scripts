@@ -9,7 +9,12 @@
         "ldap_pass": "",
         "ldap_host": "",
         "mail_attribute": "",
-        "disabled_query": "employeeType=DISABLED"
+        "alias_attribute": "",
+        "disabled_query": "employeeType=DISABLED",
+        "ldap_domains": [
+            "example.com",
+            "example2.com"
+        ]
     },
     "proxy_config": {
         "use_proxy": "",
