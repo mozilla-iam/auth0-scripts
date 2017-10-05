@@ -1,0 +1,11 @@
+{
+    "duo": {
+        "ikey": "",
+        "skey": "",
+        "api": ""
+    },
+    "groups": {
+        "whitelist": [],
+        "add_to": ""
+    }
+}
