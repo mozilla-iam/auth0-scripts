@@ -33,6 +33,6 @@ for user in users:
             foundok = True
             continue
     if not foundok:
-        print("{} {} is in groups: {} but not in group {}, adding.".format(user['username'],
+        print("{0} {1} is in groups: {2} but not in group {3}, adding.".format(user['username'],
             user['user_id'], str(grp), group_to_add_to))
         admin_api.add_user_group(user['user_id'], group_to_add_to)
