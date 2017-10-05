@@ -5,16 +5,21 @@
 # It is currently ran manually and is not intended for automatic production purposes in it's current state.
 import sys
 import duo_client
+import json
+
+config = {}
+with open('duo_api_settings.json') as fd:
+    config = json.loads(fd.read())
 
 admin_api = duo_client.Admin(
-    ikey='',
-    skey='',
-    host='',
+    ikey=config['duo']['ikey'],
+    skey=config['duo']['skey'],
+    host=config['duo']['api'],
 )
 
 users = admin_api.get_users()
-white_list_groups = []
-group_to_add_to=''
+white_list_groups = config['groups']['whitelist']
+group_to_add_to = config['groups']['add_to']
 
 for user in users:
     grp = admin_api.get_user_groups(user['user_id'])
