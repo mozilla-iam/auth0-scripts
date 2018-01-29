@@ -1,0 +1,7 @@
+ldap:
+    uri: "ldap.db.scl3.mozilla.com"
+    user: ""
+    password: ""
+    search_base:
+        groups: "ou=groups,dc=mozilla"
+        users: "o=com,dc=mozilla"
