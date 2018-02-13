@@ -4,4 +4,15 @@ ldap:
     password: ""
     search_base:
         groups: "ou=groups,dc=mozilla"
-        users: "o=com,dc=mozilla"
+        users: "dc=mozilla"
+    filter:
+        groups: "(objectClass=groupOfNames)"
+        users: "(&(objectClass=inetOrgPerson)(|(o:dn:=org)(o:dn:=com)(o:dn:=net)))"
+aws:
+    boto:
+        access_key_id: ""
+        secret_access_key: ""
+        region: "us-west-2"
+    s3:
+        bucket: "cis-ldap2s3-publisher-data"
+        env: "dev"
