@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import argparse
+import boto3
 from datetime import datetime
+import io
 import json
 from ldap3 import Server, Connection, ALL, SUBTREE
+import lzma
 import logging
 import os
 import yaml
@@ -81,9 +84,6 @@ class ldaper():
             ret = None
         return ret
 
-    def jsonize(self, data):
-        return json.dumps(data)
-
     def user(self, entry):
         """
         Finds canonical LDAP data for that user
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     # List all groups
     groups = {}
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.groups,
-                                                     search_filter='(objectClass=*)',
+                                                     search_filter=config.ldap.filter.groups,
                                                      attributes = ['cn', 'member'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     for entry in sgen:
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     # Find user emails for all users
     users = {}
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
-                                                     search_filter='(objectClass=*)',
+                                                     search_filter=config.ldap.filter.users,
                                                      attributes = ['mail'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     for entry in sgen:
@@ -154,14 +154,34 @@ if __name__ == "__main__":
     # Intersect all this to find which users belong to which group
     # Users = {'dn here': 'mail value here', ...}
     # Groups = {'group name here': ['dn here', ...], ...}
-    grouplist = {}
+
+    # Create the list of users per groups. We don't actually currently use this.
+#    grouplist = {}
+#    set_userskey = set(users.keys())
+#    for group in groups:
+#        uing = set(groups[group]) & set_userskey
+#        for u in uing:
+#            if not grouplist.get(group):
+#                grouplist[group] = []
+#            grouplist[group].append(users[u])
+
+    # Same but reverse (find which group belongs to which users). We actually use this ;-)
+    userlist = {}
     set_userskey = set(users.keys())
     for group in groups:
         uing = set(groups[group]) & set_userskey
         for u in uing:
-            if not grouplist.get(group):
-                grouplist[group] = []
-            grouplist[group].append(users[u])
+            useremail = users[u]
+            if not userlist.get(useremail):
+                userlist[useremail] = {'groups': []}
+            userlist[useremail]['groups'].append(group)
 
-    jsonized = ldaper.jsonize(ldaper, grouplist)
-    print(jsonized)
+    # Dump all this to json => s3
+    ses = boto3.Session(
+            aws_access_key_id=config.aws.boto.access_key_id,
+            aws_secret_access_key=config.aws.boto.secret_access_key)
+    s3 = ses.client('s3',
+            region_name=config.aws.boto.region)
+    # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
+    xz = lzma.compress(json.dumps(userlist, ensure_ascii=False).encode('utf-8'))
+    s3.put_object(Bucket=config.aws.s3.bucket, Key="dev/ldap.json.xz", Body=xz)
