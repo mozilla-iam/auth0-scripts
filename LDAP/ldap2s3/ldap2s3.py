@@ -184,4 +184,4 @@ if __name__ == "__main__":
             region_name=config.aws.boto.region)
     # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
     xz = lzma.compress(json.dumps(userlist, ensure_ascii=False).encode('utf-8'))
-    s3.put_object(Bucket=config.aws.s3.bucket, Key="dev/ldap.json.xz", Body=xz)
+    s3.put_object(Bucket=config.aws.s3.bucket, Key="ldap.json.xz", Body=xz)

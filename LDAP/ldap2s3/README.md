@@ -34,6 +34,11 @@ Note: all defaults pertain to Mozilla's specific LDAP setup and will probably no
 
 # Mozilla ARNs
 
-- User `arn:aws:iam::371522382791:user/ldap2s3_uploader`
-- Role `arn:aws:iam::371522382791:policy/cis-ldap2s3-publisher-data-write-only-role`
-- Bucket `arn:aws:s3:::cis-ldap2s3-publisher-data`
+- Prod
+  - User `arn:aws:iam::371522382791:user/ldap2s3_uploader`
+  - Role `arn:aws:iam::371522382791:policy/cis-ldap2s3-publisher-data-write-only-role`
+  - Bucket `arn:aws:s3:::cis-ldap2s3-publisher-data`
+- Dev
+  - User `arn:aws:iam::656532927350:user/ldap2s3_uploader`
+  - Role `arn:aws:iam::656532927350:policy/cis-ldap2s3-publisher-data-write-only`
+  - Bucket `arn:aws:s3:::dev-cis-ldap2s3-publisher-data`

@@ -14,5 +14,4 @@ aws:
         secret_access_key: ""
         region: "us-west-2"
     s3:
-        bucket: "cis-ldap2s3-publisher-data"
-        env: "dev"
+        bucket: "dev-cis-ldap2s3-publisher-data"
