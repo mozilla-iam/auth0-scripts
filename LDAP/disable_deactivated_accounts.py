@@ -37,13 +37,13 @@ def list_all_users():
                 proxies=proxy_config['proxies']
             )
             if resp.status_code != 200:
-                print "Error while getting users from Auth0"
-                print "%s %s" % (resp.status_code, resp.text)
+                print("Error while getting users from Auth0")
+                print("{code}{text}".format(code=resp.status_code, text=resp.text))
         else:
             resp = requests.get(fetch_url, headers=build_headers(), params=payload)
             if resp.status_code != 200:
-                print "Error while getting users from Auth0"
-                print "%s %s" % (resp.status_code, resp.text)
+                print("Error while getting users from Auth0")
+                print("{code}{text}".format(code=resp.status_code, text=resp.text))
         return_list += resp.json()
         try:
             fetch_url = resp.links['next']['url']
@@ -58,9 +58,7 @@ def list_all_users():
 def list_active_users(users):
     ret_users = []
     for user in users:
-    	if u'blocked' not in user:
-            ret_users.append(user)
-        elif user[u'blocked'] is not True:
+        if user.get(u'blocked') is not True:
             ret_users.append(user)
     return ret_users
 
@@ -68,9 +66,8 @@ def list_active_users(users):
 def list_blocked_users(users):
     ret_users = []
     for user in users:
-    	if u'blocked' in user:
-            if user[u'blocked'] is True:
-                ret_users.append(user)
+        if user.get(u'blocked') is True:
+            ret_users.append(user)
     return ret_users
 
 #    return [user for user in users if u'blocked' not in user or user[u'blocked'] != True]
@@ -96,7 +93,7 @@ def get_ldap_user_by_mail(conn, mail):
     elif len(member) == 0:
         return False
     else:
-        print "Something went wrong and we got %i entries and expected 0 or 1" % len(member)
+        print("Something went wrong and we got {number} entries and expected 0 or 1".format(number=len(member)))
         sys.exit(2)
 
 # this function does the actual blocking of the user in auth0
@@ -107,13 +104,13 @@ def disable_user(user_id):
     if proxy_config['use_proxy'] is True:
         resp = requests.patch(url, headers=build_headers(), data=body, proxies=proxy_config['proxies'])
         if resp.status_code != 200:
-            print "Error while blocking %:" % user_id
-            print "%s %s" % (resp.status_code, resp.text)
+            print("Error while blocking {user}:".format(user=user_id))
+            print("{code}{text}".format(code=resp.status_code, text=resp.text))
     else:
         resp = requests.patch(url, headers=build_headers(), data=body)
         if resp.status_code != 200:
-            print "Error while blocking %:" % user_id
-            print "%s %s" % (resp.status_code, resp.text)
+            print("Error while blocking {user}:".format(user=user_id))
+            print("{code}{text}".format(code=resp.status_code, text=resp.text))
     return True
 
 # this function does the unblocking of the user in auth0
@@ -124,13 +121,13 @@ def unblock_user(user_id):
     if proxy_config['use_proxy'] is True:
         resp = requests.patch(url, headers=build_headers(), data=body, proxies=proxy_config['proxies'])
         if resp.status_code != 200:
-            print "Error while unblocking %:" % user_id
-            print "%s %s" % (resp.status_code, resp.text)
+            print("Error while unblocking {user}:".format(user=user_id))
+            print("{code}{text}".format(code=resp.status_code, text=resp.text))
     else:
         resp = requests.patch(url, headers=build_headers(), data=body)
         if resp.status_code != 200:
-            print "Error while unblocking %:" % user_id
-            print "%s %s" % (resp.status_code, resp.text)
+            print("Error while unblocking {user}:".format(user=user_id))
+            print("{code}{text}".format(code=resp.status_code, text=resp.text))
     return True
 
 
@@ -159,41 +156,43 @@ def main(prog_args=None):
 
     for user in active_users:
         try:
-            email = user[u'email']
+            email = user.get(u'email')
         except (KeyError):
-            print "Cannot get email attribute for user"
+            print("Cannot get email attribute for user")
 
         try:
-            identity = user[u'user_id']
+            identity = user.get(u'user_id')
         except (KeyError):
-            print "Cannot get id attribute for user"
+            print("Cannot get id attribute for user")
+            continue
 
         if identity and email:
             for domain in ldap_config['ldap_domains']:
                 if domain in email:
                     if get_ldap_user_by_mail(ldap_conn, email) is not True\
                             and email not in disable_deactivated_accounts_config['exclusion_list']:
-                        print "Disabling Auth0 for %s" % email
+                        print("Disabling Auth0 for {user}".format(user=email))
                         if not opt.debug:
                             disable_user(identity)
 
     for user in blocked_users:
         try:
-            email = user[u'email']
+            email = user.get(u'email')
         except (KeyError):
-            print "Cannot get email attribute for user"
+            print("Cannot get email attribute for user")
 
         try:
-            identity = user[u'user_id']
+            identity = user.get(u'user_id')
         except (KeyError):
-            print "Cannot get id attribute for user"
+            print("Cannot get id attribute for user")
+            continue
 
         if identity and email:
             for domain in ldap_config['ldap_domains']:
                 if domain in email:
                     if get_ldap_user_by_mail(ldap_conn, email) is True\
                             and email not in disable_deactivated_accounts_config['exclusion_list']:
-                        print "Re-enabling Auth0 for %s" % email
+                        print("Re-enabling Auth0 for {user}".format(user=email))
                         if not opt.debug:
                             unblock_user(identity)
 
