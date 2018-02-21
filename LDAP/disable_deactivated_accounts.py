@@ -1,11 +1,13 @@
 #!/usr/bin/env python
+import os
 import sys
 import optparse
 import requests
 import ldap
 import json
 
-with open('auth0_api_settings.json') as fd:
+__location__=os.path.dirname(__file__)
+with open(os.path.join(__location__, 'auth0_api_settings.json')) as fd:
     config = json.load(fd)
     auth0_config = config['auth0_config']
     ldap_config = config['ldap_config']
