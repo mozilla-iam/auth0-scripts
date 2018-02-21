@@ -37,13 +37,13 @@ def list_all_users():
                 proxies=proxy_config['proxies']
             )
             if resp.status_code != 200:
-                print "Error while getting users from Auth0"
-                print "%s %s" % (resp.status_code, resp.text)
+                print("Error while getting users from Auth0")
+                print("{code}{text}".format(code=resp.status_code, text=resp.text))
         else:
             resp = requests.get(fetch_url, headers=build_headers(), params=payload)
             if resp.status_code != 200:
-                print "Error while getting users from Auth0"
-                print "%s %s" % (resp.status_code, resp.text)
+                print("Error while getting users from Auth0")
+                print("{code}{text}".format(code=resp.status_code, text=resp.text))
         return_list += resp.json()
         try:
             fetch_url = resp.links['next']['url']
@@ -58,9 +58,15 @@ def list_all_users():
 def list_active_users(users):
     ret_users = []
     for user in users:
-    	if u'blocked' not in user:
+        if user.get(u'blocked') is not True:
             ret_users.append(user)
-        elif user[u'blocked'] is not True:
+    return ret_users
+
+# also need a list of blocked users to see if they should be unblocked
+def list_blocked_users(users):
+    ret_users = []
+    for user in users:
+        if user.get(u'blocked') is True:
             ret_users.append(user)
     return ret_users
 
@@ -87,7 +93,7 @@ def get_ldap_user_by_mail(conn, mail):
     elif len(member) == 0:
         return False
     else:
-        print "Something went wrong and we got %i entries and expected 0 or 1" % len(member)
+        print("Something went wrong and we got {number} entries and expected 0 or 1".format(number=len(member)))
         sys.exit(2)
 
 # this function does the actual blocking of the user in auth0
@@ -98,24 +104,42 @@ def disable_user(user_id):
     if proxy_config['use_proxy'] is True:
         resp = requests.patch(url, headers=build_headers(), data=body, proxies=proxy_config['proxies'])
         if resp.status_code != 200:
-            print "Error while blocking %:" % user_id
-            print "%s %s" % (resp.status_code, resp.text)
+            print("Error while blocking {user}:".format(user=user_id))
+            print("{code}{text}".format(code=resp.status_code, text=resp.text))
     else:
         resp = requests.patch(url, headers=build_headers(), data=body)
         if resp.status_code != 200:
-            print "Error while blocking %:" % user_id
-            print "%s %s" % (resp.status_code, resp.text)
+            print("Error while blocking {user}:".format(user=user_id))
+            print("{code}{text}".format(code=resp.status_code, text=resp.text))
+    return True
+
+# this function does the unblocking of the user in auth0
+def unblock_user(user_id):
+    deactive_url = "users/%s" % user_id
+    url = "%s/%s" % (auth0_config['auth0_api_url'], deactive_url)
+    body = '{"blocked":false}'
+    if proxy_config['use_proxy'] is True:
+        resp = requests.patch(url, headers=build_headers(), data=body, proxies=proxy_config['proxies'])
+        if resp.status_code != 200:
+            print("Error while unblocking {user}:".format(user=user_id))
+            print("{code}{text}".format(code=resp.status_code, text=resp.text))
+    else:
+        resp = requests.patch(url, headers=build_headers(), data=body)
+        if resp.status_code != 200:
+            print("Error while unblocking {user}:".format(user=user_id))
+            print("{code}{text}".format(code=resp.status_code, text=resp.text))
     return True
 
 
 # main function with logic to get all the active users in auth0, check if they exist in LDAP and not disabled, then disable if not found
 # note that a user that does not exist in LDAP is equivalent to a user that is DISABLED in LDAP, due to ACLs. This cannot be distinguished without special permissions
+# if a user is blocked in Auth0, but no longer disabled in LDAP, then unblock the user
 def main(prog_args=None):
     if prog_args is None:
         prog_args = sys.argv
 
     parser = optparse.OptionParser()
-    parser.usage = """Script to disable auth0 accounts if not found in LDAP"""
+    parser.usage = """Script to disable auth0 accounts if not found in LDAP and unblock previously disabled LDAP users"""
     parser.add_option("-d", "--debug", dest="debug", action="store_true",
                       help="Run in DEBUG/NOOP Mode")
 
@@ -125,28 +149,52 @@ def main(prog_args=None):
 
     active_users = list_active_users(all_users)
 
+    block_users = list_blocked_users(all_users)
+
     ldap_conn = ldap.initialize('ldap://%s' % ldap_config['ldap_host'])
     ldap_conn.simple_bind_s(ldap_config['ldap_user'], ldap_config['ldap_pass'])
 
     for user in active_users:
         try:
-            email = user[u'email']
+            email = user.get(u'email')
         except (KeyError):
-            print "Cannot get email attribute for user"
+            print("Cannot get email attribute for user")
 
         try:
-            identity = user[u'user_id']
+            identity = user.get(u'user_id')
         except (KeyError):
-            print "Cannot get id attribute for user"
+            print("Cannot get id attribute for user")
+            continue
 
         if identity and email:
             for domain in ldap_config['ldap_domains']:
                 if domain in email:
                     if get_ldap_user_by_mail(ldap_conn, email) is not True\
                             and email not in disable_deactivated_accounts_config['exclusion_list']:
-                        print "Disabling Auth0 for %s" % email
+                        print("Disabling Auth0 for {user}".format(user=email))
                         if not opt.debug:
                             disable_user(identity)
+
+    for user in blocked_users:
+        try:
+            email = user.get(u'email')
+        except (KeyError):
+            print("Cannot get email attribute for user")
+
+        try:
+            identity = user.get(u'user_id')
+        except (KeyError):
+            print("Cannot get id attribute for user")
+            continue
+
+        if identity and email:
+            for domain in ldap_config['ldap_domains']:
+                if domain in email:
+                    if get_ldap_user_by_mail(ldap_conn, email) is True\
+                            and email not in disable_deactivated_accounts_config['exclusion_list']:
+                        print("Re-enabling Auth0 for {user}".format(user=email))
+                        if not opt.debug:
+                            unblock_user(identity)
 
 
 if __name__ == "__main__":
