@@ -167,13 +167,14 @@ if __name__ == "__main__":
 
     # Same but reverse (find which group belongs to which users). We actually use this ;-)
     userlist = {}
+    # Prefill so that we include users with no group data
+    for u in users:
+        userlist[users[u]] = {'groups': []}
     set_userskey = set(users.keys())
     for group in groups:
         uing = set(groups[group]) & set_userskey
         for u in uing:
             useremail = users[u]
-            if not userlist.get(useremail):
-                userlist[useremail] = {'groups': []}
             userlist[useremail]['groups'].append(group)
 
     # Dump all this to json => s3
@@ -184,4 +185,4 @@ if __name__ == "__main__":
             region_name=config.aws.boto.region)
     # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
     xz = lzma.compress(json.dumps(userlist, ensure_ascii=False).encode('utf-8'))
-    s3.put_object(Bucket=config.aws.s3.bucket, Key="dev/ldap.json.xz", Body=xz)
+    s3.put_object(Bucket=config.aws.s3.bucket, Key="ldap.json.xz", Body=xz)

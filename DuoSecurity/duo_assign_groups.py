@@ -4,6 +4,7 @@
 # This can be modified to do a variety of similar things
 # It is currently ran manually and is not intended for automatic production purposes in it's current state.
 import sys
+import os
 try:
     import duo_client
 # Handle legacy name
@@ -12,7 +13,8 @@ except ImportError:
 import json
 
 config = {}
-with open('duo_api_settings.json') as fd:
+__location__=os.path.dirname(__file__)
+with open(os.path.join(__location__, 'duo_api_settings.json')) as fd:
     config = json.loads(fd.read())
 
 admin_api = duo_client.Admin(
