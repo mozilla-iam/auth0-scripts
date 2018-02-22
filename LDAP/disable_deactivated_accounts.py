@@ -1,11 +1,13 @@
 #!/usr/bin/env python
+import os
 import sys
 import optparse
 import requests
 import ldap
 import json
 
-with open('auth0_api_settings.json') as fd:
+__location__=os.path.dirname(__file__)
+with open(os.path.join(__location__, 'auth0_api_settings.json')) as fd:
     config = json.load(fd)
     auth0_config = config['auth0_config']
     ldap_config = config['ldap_config']
@@ -26,8 +28,10 @@ def list_all_users():
     should_return = False
     return_list = []
     fetch_url = "%s/users" % auth0_config['auth0_api_url']
-    payload = {'fields': 'identities,user_id,email,blocked', 'include_fields': 'true'}
+    payload = {'fields': 'identities,user_id,email,blocked', 'include_fields': 'true', 'per_page': '100'}
+    count = 0
     while (should_return is False):
+        payload.update({'page': count})
         prev_url = fetch_url
         if proxy_config['use_proxy'] is True:
             resp = requests.get(
@@ -36,21 +40,17 @@ def list_all_users():
                 params=payload,
                 proxies=proxy_config['proxies']
             )
-            if resp.status_code != 200:
-                print("Error while getting users from Auth0")
-                print("{code}{text}".format(code=resp.status_code, text=resp.text))
         else:
             resp = requests.get(fetch_url, headers=build_headers(), params=payload)
-            if resp.status_code != 200:
-                print("Error while getting users from Auth0")
-                print("{code}{text}".format(code=resp.status_code, text=resp.text))
-        return_list += resp.json()
-        try:
-            fetch_url = resp.links['next']['url']
-            if fetch_url == '' or fetch_url is None or fetch_url == prev_url:
-                should_return = True
-        except (KeyError, IndexError):
+        if resp.status_code != 200:
+            print "Error while getting users from Auth0"
+            print "%s %s" % (resp.status_code, resp.text)
             should_return = True
+        elif not resp.json():
+            should_return = True
+        else:
+            return_list += resp.json()
+            count += 1
     return return_list
 
 # filter out only the active users
@@ -149,7 +149,7 @@ def main(prog_args=None):
 
     active_users = list_active_users(all_users)
 
-    block_users = list_blocked_users(all_users)
+    blocked_users = list_blocked_users(all_users)
 
     ldap_conn = ldap.initialize('ldap://%s' % ldap_config['ldap_host'])
     ldap_conn.simple_bind_s(ldap_config['ldap_user'], ldap_config['ldap_pass'])
