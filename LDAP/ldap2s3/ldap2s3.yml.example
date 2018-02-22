@@ -7,7 +7,7 @@ ldap:
         users: "dc=mozilla"
     filter:
         groups: "(objectClass=groupOfNames)"
-        users: "(&(!(employeeType=DISABLED))(objectClass=inetOrgPerson)(|(o:dn:=org)(o:dn:=com)(o:dn:=net)))"
+        users: "(&(!(employeeType=DISABLED))(objectClass=inetOrgPerson)(|(o:dn:=org)(o:dn:=com)(o:dn:=net)(ou:dn:=shared_accounts)))"
 aws:
     boto:
         access_key_id: ""
