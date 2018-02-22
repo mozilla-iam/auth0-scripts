@@ -28,7 +28,7 @@ one query is run.
 - Create a bucket
 - Create an IAM user and associated role & policy so that it can write to the bucket (see `s3_policy.json`)
 - Edit ldap2s3.yml (create it if needed by copying the example) and set all parameters
-- Generate an AWS access key and run the script.
+- Generate an AWS access key and run the script (with `-s` to send to S3): `$ ./ldap2s3.py -s`
 
 Note: all defaults pertain to Mozilla's specific LDAP setup and will probably not work out of the box elsewhere.
 

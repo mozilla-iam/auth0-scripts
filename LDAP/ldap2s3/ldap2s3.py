@@ -120,6 +120,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', help='Specify a configuration file')
     parser.add_argument('-d', '--debug', action="store_true", help='Turns on debug logging')
+    parser.add_argument('-s', '--sends3', action="store_true", help='Sends results to AWS S3 as lzma\'d JSON')
     args = parser.parse_args()
     if args.debug:
         logger = setup_logging(level=logging.DEBUG)
@@ -177,12 +178,17 @@ if __name__ == "__main__":
             useremail = users[u]
             userlist[useremail]['groups'].append(group)
 
+    logger.debug('Resulting group list:')
+    logger.debug(json.dumps(userlist))
+
     # Dump all this to json => s3
-    ses = boto3.Session(
-            aws_access_key_id=config.aws.boto.access_key_id,
-            aws_secret_access_key=config.aws.boto.secret_access_key)
-    s3 = ses.client('s3',
-            region_name=config.aws.boto.region)
-    # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
-    xz = lzma.compress(json.dumps(userlist, ensure_ascii=False).encode('utf-8'))
-    s3.put_object(Bucket=config.aws.s3.bucket, Key="ldap.json.xz", Body=xz)
+    if args.sends3:
+        logger.debug('Sending results to AWS S3')
+        ses = boto3.Session(
+                aws_access_key_id=config.aws.boto.access_key_id,
+                aws_secret_access_key=config.aws.boto.secret_access_key)
+        s3 = ses.client('s3',
+                region_name=config.aws.boto.region)
+        # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
+        xz = lzma.compress(json.dumps(userlist, ensure_ascii=False).encode('utf-8'))
+        s3.put_object(Bucket=config.aws.s3.bucket, Key="ldap.json.xz", Body=xz)
