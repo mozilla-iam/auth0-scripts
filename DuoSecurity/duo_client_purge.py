@@ -1,5 +1,7 @@
 #!/usr/bin/python
 import ldap
+import time
+
 DEBUG = False
 NOOP = False
 from local_settings import (
@@ -89,6 +91,6 @@ if __name__ == '__main__':
         if last_login:
             unix_last_login = int(last_login)
             if int(time.time()) - unix_last_login > GRACE_PERIOD:
-                print("Deleting user {} ID {}".format(duo_entry.get('email_address'), duo_entry.get('id')))
+                print("Deleting user {email} ID {uid}".format(email=duo_entry.get('email_address'), uid=duo_entry.get('id')))
                 if NOOP == False:
                     admin_api.delete_user(duo_entry.get('id'))
