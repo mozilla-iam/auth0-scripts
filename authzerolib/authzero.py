@@ -126,6 +126,27 @@ class AuthZero(object):
         user = DotDict(json.loads(res.read()))
         return user
 
+    def update_client(self, client_id, client_settings):
+        """
+        client_id: string
+        client_settings: dict (can be a JSON string loaded with json.loads(str) for example)
+
+        Updates an Auth0 client (RP) settings
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/Clients/patch_clients_by_id
+        Auth0 API endpoint: PATH /api/v2/clients/{id}
+        Auth0 API parameters: id (client_id, required), body (required)
+        """
+        payload_json = json.dumps(client_settings)
+
+        self.conn.request("PATCH",
+                          "/api/v2/clients/{}".format(client_id),
+                          payload_json,
+                          self._authorize(self.default_headers))
+        res = self.conn.getresponse()
+        self._check_http_response(res)
+        client = DotDict(json.loads(res.read()))
+        return client
+
     def update_user(self, user_id, new_profile):
         """
         user_id: string
