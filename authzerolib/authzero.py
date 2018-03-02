@@ -36,12 +36,22 @@ class AuthZero(object):
         self.access_token_scope = None
         self.access_token_valid_until = 0
         self.conn = http.client.HTTPSConnection(config.uri)
+        self.rules = []
 
         self.logger = logging.getLogger('AuthZero')
 
     def __del__(self):
         self.client_secret = None
         self.conn.close()
+
+    def get_rules(self):
+        payload = DotDict(dict())
+        payload_json = json.dumps(payload)
+
+        self.conn.request("GET",
+                             "/api/v2/rules",
+                             self._authorize(self.default_headers()))
+        ret = self._handle_response()
 
     def get_clients(self, fields="description,name,client_id,oidc_conformant,addons"):
         payload = DotDict(dict())
@@ -59,9 +69,7 @@ class AuthZero(object):
                               "".format(fields=fields, page=page, per_page=per_page),
                               payload_json,
                               self._authorize(self.default_headers))
-            res = self.conn.getresponse()
-            self._check_http_response(res)
-            ret = json.loads(res.read())
+            ret = self._handle_response()
             clients += ret['clients']
             done = done + per_page
             page = page + 1
@@ -91,9 +99,7 @@ class AuthZero(object):
                               "".format(fields=fields, query_filter=query_filter, page=page, per_page=per_page),
                               payload_json,
                               self._authorize(self.default_headers))
-            res = self.conn.getresponse()
-            self._check_http_response(res)
-            ret = json.loads(res.read())
+            ret = self._handle_response()
             users += ret['users']
             done = done + per_page
             page = page + 1
@@ -105,8 +111,7 @@ class AuthZero(object):
     def get_logs(self):
         self.conn.request("GET", "curl  https://auth-dev.mozilla.auth0.com/api/v2/logs",
                 self._authorize(self.default_headers))
-        res = self.conn.getresponse()
-        self._check_http_response(res)
+        logs = self._handle_response()
         return logs
 
     def get_user(self, user_id):
@@ -121,9 +126,7 @@ class AuthZero(object):
                           "/api/v2/users/{}".format(user_id),
                           payload_json,
                           self._authorize(self.default_headers))
-        res = self.conn.getresponse()
-        self._check_http_response(res)
-        user = DotDict(json.loads(res.read()))
+        user = self._handle_response()
         return user
 
     def update_client(self, client_id, client_settings):
@@ -142,9 +145,7 @@ class AuthZero(object):
                           "/api/v2/clients/{}".format(client_id),
                           payload_json,
                           self._authorize(self.default_headers))
-        res = self.conn.getresponse()
-        self._check_http_response(res)
-        client = DotDict(json.loads(res.read()))
+        client = self._handle_response()
         return client
 
     def update_user(self, user_id, new_profile):
@@ -172,9 +173,7 @@ class AuthZero(object):
                           "/api/v2/users/{}".format(user_id),
                           payload_json,
                           self._authorize(self.default_headers))
-        res = self.conn.getresponse()
-        self._check_http_response(res)
-        user = DotDict(json.loads(res.read()))
+        user = self._handle_response()
         return user
 
     def get_access_token(self):
@@ -190,10 +189,9 @@ class AuthZero(object):
         payload_json = json.dumps(payload)
 
         self.conn.request("POST", "/oauth/token", payload_json, self.default_headers)
-        res = self.conn.getresponse()
-        self._check_http_response(res)
+        ret = self._handle_response()
 
-        access_token = DotDict(json.loads(res.read()))
+        access_token = DotDict(ret)
         # Validation
         if ('access_token' not in access_token.keys()):
             raise Exception('InvalidAccessToken', access_token)
@@ -201,6 +199,12 @@ class AuthZero(object):
         self.access_token_valid_until = time.time() + access_token.expires_in
         self.access_token_scope = access_token.scope
         return access_token
+
+    def _handle_response(self, conn=self.conn):
+        res = conn.getresponse()
+        self._check_http_response(res)
+        ret = json.loads(res.read())
+        return ret
 
     def _authorize(self, headers):
         if not self.access_token:
