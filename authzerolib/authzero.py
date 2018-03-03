@@ -167,7 +167,7 @@ class AuthZero(object):
         payload.grant_type = "client_credentials"
         payload_json = json.dumps(payload)
 
-        ret = self._request("/oauth/token", "POST", payload_json)
+        ret = self._request("/oauth/token", "POST", payload_json, authorize=False)
 
         access_token = DotDict(ret)
         # Validation
@@ -178,9 +178,13 @@ class AuthZero(object):
         self.access_token_scope = access_token.scope
         return access_token
 
-    def _request(self, rpath, rtype="GET", payload_json={}):
+    def _request(self, rpath, rtype="GET", payload_json={}, authorize=True):
         self.logger.debug('Sending Auth0 request {} {}'.format(rtype, rpath))
-        self.conn.request(rtype, rpath, payload_json, self._authorize(self.default_headers))
+        if authorize:
+            self.conn.request(rtype, rpath, payload_json, self._authorize(self.default_headers))
+        else:
+            # Public req w/o oauth header
+            self.conn.request(rtype, rpath, payload_json, self.default_headers)
         return self._handle_response()
 
     def _handle_response(self):
