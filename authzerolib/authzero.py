@@ -200,8 +200,8 @@ class AuthZero(object):
         self.access_token_scope = access_token.scope
         return access_token
 
-    def _handle_response(self, conn=self.conn):
-        res = conn.getresponse()
+    def _handle_response(self):
+        res = self.conn.getresponse()
         self._check_http_response(res)
         ret = json.loads(res.read())
         return ret
