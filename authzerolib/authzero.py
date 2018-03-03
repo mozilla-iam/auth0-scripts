@@ -35,8 +35,6 @@ class AuthZeroRule(object):
         self.stage = 'login_success'
 
     def validate(self):
-        if self.id == None:
-            raise Exception('RuleValidationError', ('id cannot be None'))
         if self.script == None:
             raise Exception('RuleValidationError', ('script cannot be None'))
         if self.name == None:
@@ -44,6 +42,17 @@ class AuthZeroRule(object):
         if self.order <= 0:
             raise Exception('RuleValidationError', ('order must be greater than 0'))
         return True
+
+    def json(self):
+        tmp = {'id': self.id, 'enabled': self.enabled, 'script': self.script,
+               'name': self.name, 'order': self.order, 'stage': self.stage}
+        # Remove id if we don't have one. It means it's a new rule.
+        if tmp.get('id') == None:
+            tmp.pop('id')
+        return json.dumps(tmp)
+
+    def __str__(self):
+        return self.json().__str__()
 
 class AuthZero(object):
     def __init__(self, config):
@@ -68,8 +77,56 @@ class AuthZero(object):
     def get_rules(self):
         payload = DotDict(dict())
         payload_json = json.dumps(payload)
-
         return self._request("/api/v2/rules")
+
+    def delete_rule(self, rule_id):
+        """
+        rule_id: string
+        rule: AuthZeroRule object
+
+        Deletes an Auth0 rule
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/rules
+        Auth0 API endpoint: PATH /api/v2/rules/{id}
+        Auth0 API parameters: id (rule_id, required)
+        """
+        return self._request("/api/v2/rules/{}".format(rule_id), "DELETE")
+
+    def create_rule(self, rule):
+        """
+        rule_id: string
+        rule: AuthZeroRule object
+
+        Creates an Auth0 rule
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/rules
+        Auth0 API endpoint: PATH /api/v2/rules
+        Auth0 API parameters: body (required)
+        """
+        payload = DotDict(dict())
+        payload.script = rule.script
+        payload.name = rule.name
+        payload.order = rule.order
+        payload.enabled = rule.enabled
+        payload_json = json.dumps(payload)
+        return self._request("/api/v2/rules", "POST", payload_json)
+
+    def update_rule(self, rule_id, rule):
+        """
+        rule_id: string
+        rule: AuthZeroRule object
+
+        Updates an Auth0 rule
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/rules
+        Auth0 API endpoint: PATH /api/v2/rules/{id}
+        Auth0 API parameters: id (rule_id, required), body (required)
+        """
+ 
+        payload = DotDict(dict())
+        payload.script = rule.script
+        payload.name = rule.name
+        payload.order = rule.order
+        payload.enabled = rule.enabled
+        payload_json = json.dumps(payload)
+        return self._request("/api/v2/rules/{}".format(rule_id), "PATCH", payload_json)
 
     def get_clients(self, fields="description,name,client_id,oidc_conformant,addons"):
         payload = DotDict(dict())
