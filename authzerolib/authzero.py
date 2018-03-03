@@ -24,6 +24,27 @@ class DotDict(dict):
                 value = DotDict(value)
             self[key] = value
 
+class AuthZeroRule(object):
+    """Lightweight Rule Object"""
+    def __init__(self):
+        self.id = None
+        self.enabled = False
+        self.script = None
+        self.name = None
+        self.order = 0
+        self.stage = 'login_success'
+
+    def validate(self):
+        if self.id == None:
+            raise Exception('RuleValidationError', ('id cannot be None'))
+        if self.script == None:
+            raise Exception('RuleValidationError', ('script cannot be None'))
+        if self.name == None:
+            raise Exception('RuleValidationError', ('name cannot be None'))
+        if self.order <= 0:
+            raise Exception('RuleValidationError', ('order must be greater than 0'))
+        return True
+
 class AuthZero(object):
     def __init__(self, config):
         self.default_headers = {
