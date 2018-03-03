@@ -48,10 +48,7 @@ class AuthZero(object):
         payload = DotDict(dict())
         payload_json = json.dumps(payload)
 
-        self.conn.request("GET",
-                             "/api/v2/rules",
-                             self._authorize(self.default_headers()))
-        ret = self._handle_response()
+        return self._request("/api/v2/rules")
 
     def get_clients(self, fields="description,name,client_id,oidc_conformant,addons"):
         payload = DotDict(dict())
@@ -62,14 +59,11 @@ class AuthZero(object):
         done = -1
         clients = []
         while totals > done:
-            self.conn.request("GET",
-                              "/api/v2/clients?fields={fields}"
-                              "&per_page={per_page}"
-                              "&page={page}&include_totals=true"
-                              "".format(fields=fields, page=page, per_page=per_page),
-                              payload_json,
-                              self._authorize(self.default_headers))
-            ret = self._handle_response()
+            ret = self._request("/api/v2/clients?fields={fields}"
+                          "&per_page={per_page}"
+                          "&page={page}&include_totals=true"
+                          "".format(fields=fields, page=page, per_page=per_page),
+                          payload_json)
             clients += ret['clients']
             done = done + per_page
             page = page + 1
@@ -92,14 +86,11 @@ class AuthZero(object):
         done = -1
         users = []
         while totals > done:
-            self.conn.request("GET",
-                              "/api/v2/users?fields={fields}&"
-                              "search_engine=v2&q={query_filter}&per_page={per_page}"
-                              "&page={page}&include_totals=true"
-                              "".format(fields=fields, query_filter=query_filter, page=page, per_page=per_page),
-                              payload_json,
-                              self._authorize(self.default_headers))
-            ret = self._handle_response()
+            ret = self._request("/api/v2/users?fields={fields}&"
+                          "search_engine=v2&q={query_filter}&per_page={per_page}"
+                          "&page={page}&include_totals=true"
+                          "".format(fields=fields, query_filter=query_filter, page=page, per_page=per_page),
+                          payload_json)
             users += ret['users']
             done = done + per_page
             page = page + 1
@@ -109,10 +100,7 @@ class AuthZero(object):
         return users
 
     def get_logs(self):
-        self.conn.request("GET", "curl  https://auth-dev.mozilla.auth0.com/api/v2/logs",
-                self._authorize(self.default_headers))
-        logs = self._handle_response()
-        return logs
+        return self._request("https://auth-dev.mozilla.auth0.com/api/v2/logs")
 
     def get_user(self, user_id):
         """Return user from the Auth0 API.
@@ -122,12 +110,8 @@ class AuthZero(object):
 
         payload = DotDict(dict())
         payload_json = json.dumps(payload)
-        self.conn.request("GET",
-                          "/api/v2/users/{}".format(user_id),
-                          payload_json,
-                          self._authorize(self.default_headers))
-        user = self._handle_response()
-        return user
+        return self._request("/api/v2/users/{}".format(user_id),
+                             payload_json)
 
     def update_client(self, client_id, client_settings):
         """
@@ -141,11 +125,9 @@ class AuthZero(object):
         """
         payload_json = json.dumps(client_settings)
 
-        self.conn.request("PATCH",
-                          "/api/v2/clients/{}".format(client_id),
-                          payload_json,
-                          self._authorize(self.default_headers))
-        client = self._handle_response()
+        client = self._request("/api/v2/clients/{}".format(client_id),
+                               "PATCH",
+                               payload_json)
         return client
 
     def update_user(self, user_id, new_profile):
@@ -169,12 +151,9 @@ class AuthZero(object):
         # This validates the JSON as well
         payload_json = json.dumps(payload)
 
-        self.conn.request("PATCH",
-                          "/api/v2/users/{}".format(user_id),
-                          payload_json,
-                          self._authorize(self.default_headers))
-        user = self._handle_response()
-        return user
+        return self._request("/api/v2/users/{}".format(user_id),
+                             "PATCH",
+                             payload_json)
 
     def get_access_token(self):
         """
@@ -188,8 +167,7 @@ class AuthZero(object):
         payload.grant_type = "client_credentials"
         payload_json = json.dumps(payload)
 
-        self.conn.request("POST", "/oauth/token", payload_json, self.default_headers)
-        ret = self._handle_response()
+        ret = self._request("/oauth/token", "POST", payload_json)
 
         access_token = DotDict(ret)
         # Validation
@@ -199,6 +177,11 @@ class AuthZero(object):
         self.access_token_valid_until = time.time() + access_token.expires_in
         self.access_token_scope = access_token.scope
         return access_token
+
+    def _request(self, rpath, rtype="GET", payload_json={}):
+        self.logger.debug('Sending Auth0 request {} {}'.format(rtype, rpath))
+        self.conn.request(rtype, rpath, payload_json, self._authorize(self.default_headers))
+        return self._handle_response()
 
     def _handle_response(self):
         res = self.conn.getresponse()
