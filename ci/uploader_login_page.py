@@ -6,6 +6,7 @@
 # Copyright (c) 2017 Mozilla Corporation
 # Contributors: Guillaume Destuynder <kang@mozilla.com>
 
+import argparse
 import logging
 import time
 import json
@@ -45,17 +46,15 @@ if __name__ == "__main__":
     parser.add_argument('--login-page', required=True, help='Auth0 hosted login page (HTML)')
     args = parser.parse_args()
 
-    config = {'client_id': args.clientid, 'client_secret': args.clientsecret, 'uri': args.uri}
+    config = DotDict({'client_id': args.clientid, 'client_secret': args.clientsecret, 'uri': args.uri})
     authzero = AuthZero(config)
-    logger.debug("Auth0 initialized")
-
     authzero.get_access_token()
     logger.debug("Got access token for client_id:{}".format(args.clientid))
-    client = DotDict(dict())
 
+    client_attributes = DotDict(dict())
     with open(args.login_page, 'r') as fd:
-        client.custom_login_page = fd.read()
+        client_attributes.custom_login_page = fd.read()
     # on any error, `authzero` will raise an exception and python will exit with non-zero code
-    ret = authzero.update_client(default_client, client)
+    ret = authzero.update_client(args.default_client, client_attributes)
     logger.debug("Default client updated {}".format(ret))
     sys.exit(0)
