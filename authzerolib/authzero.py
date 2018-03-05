@@ -128,10 +128,8 @@ class AuthZero(object):
         payload_json = json.dumps(payload)
         return self._request("/api/v2/rules/{}".format(rule_id), "PATCH", payload_json)
 
-    def get_clients(self, fields="description,name,client_id,oidc_conformant,addons"):
+    def get_clients(self):
         """
-        fields: string
-
         Get list of Auth0 clients
         Auth0 API doc: https://auth0.com/docs/api/management/v2#!/clients
         Auth0 API endpoint: PATH /api/v2/clients
@@ -146,11 +144,11 @@ class AuthZero(object):
         done = -1
         clients = []
         while totals > done:
-            ret = self._request("/api/v2/clients?fields={fields}"
+            ret = self._request("/api/v2/clients?"
                           "&per_page={per_page}"
                           "&page={page}&include_totals=true"
-                          "".format(fields=fields, page=page, per_page=per_page),
-                          "POST",
+                          "".format(page=page, per_page=per_page),
+                          "GET",
                           payload_json)
             clients += ret['clients']
             done = done + per_page
