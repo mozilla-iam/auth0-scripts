@@ -119,7 +119,7 @@ class AuthZero(object):
         Auth0 API endpoint: PATH /api/v2/rules/{id}
         Auth0 API parameters: id (rule_id, required), body (required)
         """
- 
+
         payload = DotDict(dict())
         payload.script = rule.script
         payload.name = rule.name
@@ -129,6 +129,15 @@ class AuthZero(object):
         return self._request("/api/v2/rules/{}".format(rule_id), "PATCH", payload_json)
 
     def get_clients(self, fields="description,name,client_id,oidc_conformant,addons"):
+        """
+        fields: string
+
+        Get list of Auth0 clients
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/clients
+        Auth0 API endpoint: PATH /api/v2/clients
+        Auth0 API parameters: fields (optional), ...
+        """
+
         payload = DotDict(dict())
         payload_json = json.dumps(payload)
         page = 0
@@ -141,6 +150,7 @@ class AuthZero(object):
                           "&per_page={per_page}"
                           "&page={page}&include_totals=true"
                           "".format(fields=fields, page=page, per_page=per_page),
+                          "POST",
                           payload_json)
             clients += ret['clients']
             done = done + per_page
@@ -148,6 +158,45 @@ class AuthZero(object):
             totals = ret['total']
             logging.debug("Got {} clients out of {} - current page {}".format(done, totals, page))
         return clients
+
+    def create_client(self, client):
+        """
+        client: client object (dict)
+
+        Create an Auth0 client
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/clients
+        Auth0 API endpoint: PATH /api/v2/clients
+        Auth0 API parameters: body (required)
+        """
+        payload_json = json.dumps(client)
+        return self._request("/api/v2/clients", "POST", payload_json)
+
+    def update_client(self, client_id, client):
+        """
+        client_id: client id (string)
+        client: client object (dict)
+
+        Update an Auth0 client
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/clients
+        Auth0 API endpoint: PATH /api/v2/clients
+        Auth0 API parameters: id (required), body (required)
+        """
+        payload_json = json.dumps(client)
+        return self._request("/api/v2/clients/{}".format(client_id),
+                             "PATCH",
+                             payload_json)
+
+    def delete_client(self, client_id):
+        """
+        client_id: client id (string)
+
+        Delete an Auth0 client
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/clients
+        Auth0 API endpoint: PATH /api/v2/clients
+        Auth0 API parameters: id (required), body (required)
+        """
+        return self._request("/api/v2/clients/{}".format(client_id), "DELETE")
+
 
     def get_users(self, fields="username,user_id,name,email,identities,groups", query_filter=""):
         """
