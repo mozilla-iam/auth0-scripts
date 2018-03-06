@@ -115,7 +115,7 @@ if __name__ == "__main__":
     ## Delete first in case we need to get some order numbers free'd
     for r in remove_rules:
         logger.debug("Removing rule {} ({}) from Auth0".format(r.name, r.id))
-        authzero.remove_rule(r.id)
+        authzero.delete_rule(r.id)
 
     ## Update & Create (I believe this may be atomic swaps for updates)
     for r in local_rules:

@@ -179,6 +179,8 @@ class AuthZero(object):
         Auth0 API endpoint: PATH /api/v2/clients
         Auth0 API parameters: id (required), body (required)
         """
+        client.pop('tenant')
+        client.pop('global')
         payload_json = json.dumps(client)
         return self._request("/api/v2/clients/{}".format(client_id),
                              "PATCH",
@@ -237,23 +239,6 @@ class AuthZero(object):
         payload_json = json.dumps(payload)
         return self._request("/api/v2/users/{}".format(user_id),
                              payload_json)
-
-    def update_client(self, client_id, client_settings):
-        """
-        client_id: string
-        client_settings: dict (can be a JSON string loaded with json.loads(str) for example)
-
-        Updates an Auth0 client (RP) settings
-        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/Clients/patch_clients_by_id
-        Auth0 API endpoint: PATH /api/v2/clients/{id}
-        Auth0 API parameters: id (client_id, required), body (required)
-        """
-        payload_json = json.dumps(client_settings)
-
-        client = self._request("/api/v2/clients/{}".format(client_id),
-                               "PATCH",
-                               payload_json)
-        return client
 
     def update_user(self, user_id, new_profile):
         """
