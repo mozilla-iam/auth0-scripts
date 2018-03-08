@@ -13,6 +13,12 @@ import os
 import yaml
 import sys
 
+# P2 compat
+try:
+    FileNotFoundError
+except NameError:
+    FileNotFoundError = IOError
+
 
 def setup_logging(stream=sys.stderr, level=logging.INFO):
     formatstr="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
@@ -20,6 +26,7 @@ def setup_logging(stream=sys.stderr, level=logging.INFO):
     logger = logging.getLogger(__name__)
     logger.setLevel(level)
     return logger
+
 
 class DotDict(dict):
     """
@@ -37,6 +44,7 @@ class DotDict(dict):
 
     def __getstate__(self):
         return self.__dict__
+
 
 class ldaper():
     def __init__(self, uri, user, password):
@@ -113,6 +121,7 @@ class ldaper():
             logger.warning('Empty group for {}'.format(entry.get('raw_dn')))
 
         return group
+
 
 if __name__ == "__main__":
     global logger
