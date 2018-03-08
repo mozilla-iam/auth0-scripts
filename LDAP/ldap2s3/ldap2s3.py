@@ -225,5 +225,5 @@ if __name__ == "__main__":
         s3 = ses.client('s3',
                 region_name=config.aws.boto.region)
         # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
-        xz = lzma.compress(userlist_json)
+        xz = lzma.compress(userlist_json_str)
         s3.put_object(Bucket=config.aws.s3.bucket, Key="ldap.json.xz", Body=xz)
