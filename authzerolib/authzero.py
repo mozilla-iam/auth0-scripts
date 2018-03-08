@@ -24,6 +24,36 @@ class DotDict(dict):
                 value = DotDict(value)
             self[key] = value
 
+class AuthZeroRule(object):
+    """Lightweight Rule Object"""
+    def __init__(self):
+        self.id = None
+        self.enabled = False
+        self.script = None
+        self.name = None
+        self.order = 0
+        self.stage = 'login_success'
+
+    def validate(self):
+        if self.script == None:
+            raise Exception('RuleValidationError', ('script cannot be None'))
+        if self.name == None:
+            raise Exception('RuleValidationError', ('name cannot be None'))
+        if self.order <= 0:
+            raise Exception('RuleValidationError', ('order must be greater than 0'))
+        return True
+
+    def json(self):
+        tmp = {'id': self.id, 'enabled': self.enabled, 'script': self.script,
+               'name': self.name, 'order': self.order, 'stage': self.stage}
+        # Remove id if we don't have one. It means it's a new rule.
+        if tmp.get('id') == None:
+            tmp.pop('id')
+        return json.dumps(tmp)
+
+    def __str__(self):
+        return self.json().__str__()
+
 class AuthZero(object):
     def __init__(self, config):
         self.default_headers = {
@@ -47,11 +77,56 @@ class AuthZero(object):
     def get_rules(self):
         payload = DotDict(dict())
         payload_json = json.dumps(payload)
+        return self._request("/api/v2/rules")
 
-        self.conn.request("GET",
-                             "/api/v2/rules",
-                             self._authorize(self.default_headers()))
-        ret = self._handle_response()
+    def delete_rule(self, rule_id):
+        """
+        rule_id: string
+        rule: AuthZeroRule object
+
+        Deletes an Auth0 rule
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/rules
+        Auth0 API endpoint: PATH /api/v2/rules/{id}
+        Auth0 API parameters: id (rule_id, required)
+        """
+        return self._request("/api/v2/rules/{}".format(rule_id), "DELETE")
+
+    def create_rule(self, rule):
+        """
+        rule_id: string
+        rule: AuthZeroRule object
+
+        Creates an Auth0 rule
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/rules
+        Auth0 API endpoint: PATH /api/v2/rules
+        Auth0 API parameters: body (required)
+        """
+        payload = DotDict(dict())
+        payload.script = rule.script
+        payload.name = rule.name
+        payload.order = rule.order
+        payload.enabled = rule.enabled
+        payload_json = json.dumps(payload)
+        return self._request("/api/v2/rules", "POST", payload_json)
+
+    def update_rule(self, rule_id, rule):
+        """
+        rule_id: string
+        rule: AuthZeroRule object
+
+        Updates an Auth0 rule
+        Auth0 API doc: https://auth0.com/docs/api/management/v2#!/rules
+        Auth0 API endpoint: PATH /api/v2/rules/{id}
+        Auth0 API parameters: id (rule_id, required), body (required)
+        """
+ 
+        payload = DotDict(dict())
+        payload.script = rule.script
+        payload.name = rule.name
+        payload.order = rule.order
+        payload.enabled = rule.enabled
+        payload_json = json.dumps(payload)
+        return self._request("/api/v2/rules/{}".format(rule_id), "PATCH", payload_json)
 
     def get_clients(self, fields="description,name,client_id,oidc_conformant,addons"):
         payload = DotDict(dict())
@@ -62,14 +137,11 @@ class AuthZero(object):
         done = -1
         clients = []
         while totals > done:
-            self.conn.request("GET",
-                              "/api/v2/clients?fields={fields}"
-                              "&per_page={per_page}"
-                              "&page={page}&include_totals=true"
-                              "".format(fields=fields, page=page, per_page=per_page),
-                              payload_json,
-                              self._authorize(self.default_headers))
-            ret = self._handle_response()
+            ret = self._request("/api/v2/clients?fields={fields}"
+                          "&per_page={per_page}"
+                          "&page={page}&include_totals=true"
+                          "".format(fields=fields, page=page, per_page=per_page),
+                          payload_json)
             clients += ret['clients']
             done = done + per_page
             page = page + 1
@@ -92,14 +164,11 @@ class AuthZero(object):
         done = -1
         users = []
         while totals > done:
-            self.conn.request("GET",
-                              "/api/v2/users?fields={fields}&"
-                              "search_engine=v2&q={query_filter}&per_page={per_page}"
-                              "&page={page}&include_totals=true"
-                              "".format(fields=fields, query_filter=query_filter, page=page, per_page=per_page),
-                              payload_json,
-                              self._authorize(self.default_headers))
-            ret = self._handle_response()
+            ret = self._request("/api/v2/users?fields={fields}&"
+                          "search_engine=v2&q={query_filter}&per_page={per_page}"
+                          "&page={page}&include_totals=true"
+                          "".format(fields=fields, query_filter=query_filter, page=page, per_page=per_page),
+                          payload_json)
             users += ret['users']
             done = done + per_page
             page = page + 1
@@ -109,10 +178,7 @@ class AuthZero(object):
         return users
 
     def get_logs(self):
-        self.conn.request("GET", "curl  https://auth-dev.mozilla.auth0.com/api/v2/logs",
-                self._authorize(self.default_headers))
-        logs = self._handle_response()
-        return logs
+        return self._request("https://auth-dev.mozilla.auth0.com/api/v2/logs")
 
     def get_user(self, user_id):
         """Return user from the Auth0 API.
@@ -122,12 +188,8 @@ class AuthZero(object):
 
         payload = DotDict(dict())
         payload_json = json.dumps(payload)
-        self.conn.request("GET",
-                          "/api/v2/users/{}".format(user_id),
-                          payload_json,
-                          self._authorize(self.default_headers))
-        user = self._handle_response()
-        return user
+        return self._request("/api/v2/users/{}".format(user_id),
+                             payload_json)
 
     def update_client(self, client_id, client_settings):
         """
@@ -141,11 +203,9 @@ class AuthZero(object):
         """
         payload_json = json.dumps(client_settings)
 
-        self.conn.request("PATCH",
-                          "/api/v2/clients/{}".format(client_id),
-                          payload_json,
-                          self._authorize(self.default_headers))
-        client = self._handle_response()
+        client = self._request("/api/v2/clients/{}".format(client_id),
+                               "PATCH",
+                               payload_json)
         return client
 
     def update_user(self, user_id, new_profile):
@@ -169,12 +229,9 @@ class AuthZero(object):
         # This validates the JSON as well
         payload_json = json.dumps(payload)
 
-        self.conn.request("PATCH",
-                          "/api/v2/users/{}".format(user_id),
-                          payload_json,
-                          self._authorize(self.default_headers))
-        user = self._handle_response()
-        return user
+        return self._request("/api/v2/users/{}".format(user_id),
+                             "PATCH",
+                             payload_json)
 
     def get_access_token(self):
         """
@@ -188,8 +245,7 @@ class AuthZero(object):
         payload.grant_type = "client_credentials"
         payload_json = json.dumps(payload)
 
-        self.conn.request("POST", "/oauth/token", payload_json, self.default_headers)
-        ret = self._handle_response()
+        ret = self._request("/oauth/token", "POST", payload_json, authorize=False)
 
         access_token = DotDict(ret)
         # Validation
@@ -199,6 +255,15 @@ class AuthZero(object):
         self.access_token_valid_until = time.time() + access_token.expires_in
         self.access_token_scope = access_token.scope
         return access_token
+
+    def _request(self, rpath, rtype="GET", payload_json={}, authorize=True):
+        self.logger.debug('Sending Auth0 request {} {}'.format(rtype, rpath))
+        if authorize:
+            self.conn.request(rtype, rpath, payload_json, self._authorize(self.default_headers))
+        else:
+            # Public req w/o oauth header
+            self.conn.request(rtype, rpath, payload_json, self.default_headers)
+        return self._handle_response()
 
     def _handle_response(self):
         res = self.conn.getresponse()
