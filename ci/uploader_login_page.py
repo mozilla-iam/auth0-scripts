@@ -10,9 +10,6 @@ import argparse
 import json
 import logging
 import sys
-# This allows running the script "in place"
-# Otherwise, make sure you have the authzero module available
-sys.path.append('../authzerolib')
 from authzero import AuthZero
 
 class DotDict(dict):

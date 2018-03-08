@@ -12,9 +12,6 @@ import json
 import logging
 import os
 import sys
-# This allows running the script "in place"
-# Otherwise, make sure you have the authzero module available
-sys.path.append('../authzerolib')
 from authzero import AuthZero,AuthZeroRule
 
 class DotDict(dict):
