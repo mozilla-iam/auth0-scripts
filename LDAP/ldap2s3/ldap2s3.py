@@ -120,6 +120,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', help='Specify a configuration file')
     parser.add_argument('-d', '--debug', action="store_true", help='Turns on debug logging')
+    parser.add_argument('-f', '--force', action="store_true", help='Force sending to S3 even if there was no change detected')
     parser.add_argument('-s', '--sends3', action="store_true", help='Sends results to AWS S3 as lzma\'d JSON')
     args = parser.parse_args()
     if args.debug:
@@ -180,9 +181,34 @@ if __name__ == "__main__":
 
     logger.debug('Resulting group list:')
     logger.debug(json.dumps(userlist))
+    userlist_json_str = json.dumps(userlist, ensure_ascii=False).encode('utf-8')
+
+    # Compare with cache
+    changes_detected = True # Default to "we have changes" in case cache does not exist
+    try:
+        with open(config.aws.s3.cache, 'r') as fd:
+            cached = json.load(fd)
+            if (sorted(cached.items()) == sorted(userlist.items())):
+                logger.debug("No change detected since last run - won't upload to S3")
+                changes_detected = False
+            else:
+                logger.debug("Changes have been detected since last run")
+                changes_detected = True
+    except FileNotFoundError:
+        logger.debug("No cache found, interpreting result as: changes are detected")
+
+    # Write new version to cache
+    if changes_detected:
+        with open(config.aws.s3.cache, 'wb') as fd:
+            fd.write(userlist_json_str)
+            logger.debug("Updated cache")
+
+    if args.force:
+        logger.warning("Forcing changes_detected to True by user request - this will force S3 uploads even if no changes are present")
+        changes_detected = True
 
     # Dump all this to json => s3
-    if args.sends3:
+    if args.sends3 and changes_detected:
         logger.debug('Sending results to AWS S3')
         ses = boto3.Session(
                 aws_access_key_id=config.aws.boto.access_key_id,
@@ -190,5 +216,5 @@ if __name__ == "__main__":
         s3 = ses.client('s3',
                 region_name=config.aws.boto.region)
         # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
-        xz = lzma.compress(json.dumps(userlist, ensure_ascii=False).encode('utf-8'))
+        xz = lzma.compress(userlist_json)
         s3.put_object(Bucket=config.aws.s3.bucket, Key="ldap.json.xz", Body=xz)

@@ -5,6 +5,8 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Added
+- Support for caching results in ldap2s3 (so that S3 gets updated only if an actual change is detected)
 
 ## 1.0.0 - 2018-03-02
 ### Added
