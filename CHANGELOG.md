@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Added
 - Support for caching results in ldap2s3 (so that S3 gets updated only if an actual change is detected)
+- Support for sending SSH and PGP fingerprints in ldap2s3
 
 ### Changed
 - Moved authzerolib and ci to https://github.com/mozilla-iam/authzerolib and https://github.com/mozilla-iam/auth0-ci
