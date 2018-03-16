@@ -92,6 +92,26 @@ class ldaper():
             ret = None
         return ret
 
+    def normalize_ssh(self, sshlist):
+        ret = []
+        for s in sshlist:
+            ss = s.decode('utf-8')
+            ret.append(ss.strip(' '))
+
+        return ret
+
+    def normalize_pgp(self, pgplist):
+        ret = []
+        for s in pgplist:
+            ss = s.decode('utf-8')
+            tmp = ss.strip(' ').replace(' ', '')
+            if tmp.startswith('0x'):
+                ret.append(tmp)
+            else:
+                ret.append('0x{}'.format(tmp))
+
+        return ret
+
     def user(self, entry):
         """
         Finds canonical LDAP data for that user
@@ -102,6 +122,9 @@ class ldaper():
         user.dn = self.gfe(entry, 'raw_dn')
         if not user.mail or not user.dn:
             logger.warning('Invalid user specification dn: {} mail: {}'.format(user.dn, user.mail))
+
+        user.sshPublicKey = self.normalize_ssh(attrs.get('sshPublicKey'))
+        user.pgpFingerprint = self.normalize_pgp(attrs.get('pgpFingerprint'))
 
         return user
 
@@ -156,11 +179,11 @@ if __name__ == "__main__":
     users = {}
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
-                                                     attributes = ['mail'],
+                                                     attributes = ['mail', 'sshPublicKey', 'pgpFingerprint'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     for entry in sgen:
         u = mozldap.user(entry)
-        users[u.dn] = u.mail
+        users[u.dn] = {'mail': u.mail, 'SSHFingerprints': u.sshPublicKey, 'PGPFingerprints': u.pgpFingerprint}
 
     # Intersect all this to find which users belong to which group
     # Users = {'dn here': 'mail value here', ...}
@@ -178,15 +201,19 @@ if __name__ == "__main__":
 
     # Same but reverse (find which group belongs to which users). We actually use this ;-)
     userlist = {}
-    # Prefill so that we include users with no group data
+    # Prefill so that we include users with no group data and default other attributes
     for u in users:
-        userlist[users[u]] = {'groups': []}
+        user = users[u]
+        useremail = user.get('mail')
+        userlist[useremail] = {'groups': [], 'SSHFingerprints': user.get('SSHFingerprints'), 'PGPFingerprints': user.get('PGPFingerprints')}
     set_userskey = set(users.keys())
     for group in groups:
         uing = set(groups[group]) & set_userskey
         for u in uing:
-            useremail = users[u]
+            useremail = users[u]['mail']
             userlist[useremail]['groups'].append(group)
+
+    # Add user attributes
 
     logger.debug('Resulting group list:')
     logger.debug(json.dumps(userlist))
