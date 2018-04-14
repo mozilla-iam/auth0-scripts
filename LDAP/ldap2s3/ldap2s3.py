@@ -194,6 +194,11 @@ class ldaper():
                      }
             user.PGPFingerprints.append(pgpkey)
 
+        # Phone numbers - note, its not in "telephoneNumber" which is only an extension for VOIP
+        phones = attrs.get('mobile')
+        for p in phones:
+            user.phoneNumbers.append(p.decode('utf-8'))
+
         # Names
         user.firstName = self.gfe(attrs, 'givenName')
         user.lastName = self.gfe(attrs, 'sn')
@@ -262,7 +267,7 @@ if __name__ == "__main__":
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
                                                      attributes = ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
-                                                                   'givenName', 'workdayTimezone', 'telephoneNumber',
+                                                                   'givenName', 'mobile',
                                                                    'createTimestamp', 'modifyTimestamp'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     # Create the list of all users

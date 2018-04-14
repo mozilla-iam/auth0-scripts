@@ -11,7 +11,7 @@ ldap:
 cis:
     schema: 'schema.json'
     skeleton: 'profile.json'
-    user_id_prefix: 'ad|Mozilla-LDAP|'
+    user_id_prefix: 'ad|Mozilla-LDAP'
 aws:
     boto:
         access_key_id: ""
