@@ -171,7 +171,7 @@ class ldaper():
         # Terrible hack to emulate the LDAP user_id
         # This NEEDS to match Auth0 LDAP user_ids
         # XXX Replace this by opaque UUIDs someday, as well as in the Auth0 LDAP Connector
-        user.userName = "{}".format(user.primaryEmail.split('@')[0])
+        user.userName = self.gfe(attrs, 'uid')
         user.user_id = "{}|{}".format(self.cis_config.user_id_prefix, user.userName)
 
         # SSH Key
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
                                                      attributes = ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
-                                                                   'givenName', 'mobile',
+                                                                   'givenName', 'mobile', 'uid',
                                                                    'createTimestamp', 'modifyTimestamp'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     # Create the list of all users
