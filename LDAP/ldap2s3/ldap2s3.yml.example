@@ -8,6 +8,10 @@ ldap:
     filter:
         groups: "(objectClass=groupOfNames)"
         users: "(&(!(employeeType=DISABLED))(objectClass=inetOrgPerson)(|(o:dn:=org)(o:dn:=com)(o:dn:=net)(ou:dn:=shared_accounts)))"
+cis:
+    schema: 'schema.json'
+    skeleton: 'profile.json'
+    user_id_prefix: 'ad|Mozilla-LDAP'
 aws:
     boto:
         access_key_id: ""
@@ -15,4 +19,5 @@ aws:
         region: "us-west-2"
     s3:
         bucket: "dev-cis-ldap2s3-publisher-data"
+        filename: "ldap-full-profile.json.xz"
         cache: "/var/tmp/ldap2s3-cache.json"

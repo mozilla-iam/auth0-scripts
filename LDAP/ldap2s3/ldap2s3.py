@@ -4,14 +4,14 @@
 import argparse
 import boto3
 from datetime import datetime
-import io
 import json
-from ldap3 import Server, Connection, ALL, SUBTREE
+from ldap3 import Server, Connection, SUBTREE
 import lzma
 import logging
 import os
 import yaml
 import sys
+import jsonschema
 
 # P2 compat
 try:
@@ -47,11 +47,25 @@ class DotDict(dict):
 
 
 class ldaper():
-    def __init__(self, uri, user, password):
+    def __init__(self, uri, user, password, cis_config):
         global logger
         # This could use the IAM profile eventually if we wanted, with schema validation
         # That said for now we only care about groups
-        self.userprofile = {'dn', 'email', 'groups'}
+
+        # Read the user profile in a string but don't parse it yet to avoid having
+        # To copy a bunch of dicts, which would cause MemoryError exceptions
+        profile_file = cis_config.skeleton
+        try:
+            with open(profile_file) as fd:
+                self.userprofile_json = fd.read()
+        except FileNotFoundError:
+            logger.critical("FATAL: Could not find default profile file: {}. Please check configuration."
+                            .format(profile_file))
+            sys.exit(127)
+            return # Not reached
+
+        self.cis_config = cis_config
+
         self.connect(uri, user, password)
 
     def connect(self, uri, user, password):
@@ -96,7 +110,7 @@ class ldaper():
         ret = []
         for s in sshlist:
             ss = s.decode('utf-8')
-            ret.append(ss.strip(' '))
+            ret.append(ss.strip(' ').strip('\r\n'))
 
         return ret
 
@@ -112,21 +126,94 @@ class ldaper():
 
         return ret
 
+    def validate_user(self, user_profile):
+        """
+        Validate a user profile against CIS profile
+        Returns True if the profile validate, False if not.
+        @user_profile: dict
+        """
+        schema_file = self.cis_config.schema
+        try:
+            with open(schema_file) as fd:
+                schema = json.load(fd)
+        except FileNotFoundError:
+            return False
+
+        try:
+            jsonschema.validate(user_profile, schema)
+            return True
+        except jsonschema.exceptions.ValidationError:
+            return False
+
     def user(self, entry):
         """
         Finds canonical LDAP data for that user
         """
-        user = DotDict(dict())
+        user = DotDict(json.loads(self.userprofile_json))
+
+        # Add LDAP attributes
         attrs = entry.get('raw_attributes')
-        user.mail = self.gfe(attrs, 'mail')
-        user.dn = self.gfe(entry, 'raw_dn')
-        if not user.mail or not user.dn:
-            logger.warning('Invalid user specification dn: {} mail: {}'.format(user.dn, user.mail))
+        dn = self.gfe(entry, 'raw_dn')
 
-        user.sshPublicKey = self.normalize_ssh(attrs.get('sshPublicKey'))
-        user.pgpFingerprint = self.normalize_pgp(attrs.get('pgpFingerprint'))
+        # Insert LDAP email as primary email
+        user.primaryEmail = self.gfe(attrs, 'mail')
+        email = {
+                  'value': user.primaryEmail,
+                  'verified': True,
+                  'primary': True,
+                  'name': 'LDAP-imported Email'
+                }
+        user.emails.append(email)
 
-        return user
+        if not user.primaryEmail or not dn:
+            logger.warning('Invalid user specification dn: {} mail: {}'.format(dn, user.primaryEmail))
+
+        # Terrible hack to emulate the LDAP user_id
+        # This NEEDS to match Auth0 LDAP user_ids
+        # XXX Replace this by opaque UUIDs someday, as well as in the Auth0 LDAP Connector
+        user.userName = self.gfe(attrs, 'uid')
+        user.user_id = "{}|{}".format(self.cis_config.user_id_prefix, user.userName)
+
+        # SSH Key
+        for k in self.normalize_ssh(attrs.get('sshPublicKey')):
+            sshkey = {
+                      'value': k,
+                      'verified': False,
+                      'primary': True,
+                      'name': 'LDAP-imported SSH Public key'
+                     }
+            user.SSHFingerprints.append(sshkey)
+
+        # PGP Key
+        for k in self.normalize_pgp(attrs.get('pgpFingerprint')):
+            pgpkey = {
+                      'value': k,
+                      'verified': False,
+                      'primary': True,
+                      'name': 'LDAP-imported PGP Public key'
+                     }
+            user.PGPFingerprints.append(pgpkey)
+
+        # Phone numbers - note, its not in "telephoneNumber" which is only an extension for VOIP
+        phones = attrs.get('mobile')
+        for p in phones:
+            user.phoneNumbers.append(p.decode('utf-8'))
+
+        # Names
+        user.firstName = self.gfe(attrs, 'givenName')
+        user.lastName = self.gfe(attrs, 'sn')
+        user.displayName = "{} {}".format(user.firstName, user.lastName)
+
+        # Times - Profile output format is 2017-03-09T21:28:51.851Z
+        dt = entry.get('attributes').get('createTimestamp')
+        created = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
+        user.created = created
+
+        dt = entry.get('attributes').get('modifyTimestamp')
+        lastModified = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
+        user.lastModified = lastModified
+
+        return (dn, user)
 
     def group(self, entry):
         # Note we cannot rely on the mail= part of the dn here, so we don't
@@ -163,7 +250,7 @@ if __name__ == "__main__":
         config = DotDict(yaml.load(fd))
 
 
-    mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password)
+    mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis)
 
     # List all groups
     groups = {}
@@ -179,52 +266,39 @@ if __name__ == "__main__":
     users = {}
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
-                                                     attributes = ['mail', 'sshPublicKey', 'pgpFingerprint'],
+                                                     attributes = ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
+                                                                   'givenName', 'mobile', 'uid',
+                                                                   'createTimestamp', 'modifyTimestamp'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
+    # Create the list of all users
     for entry in sgen:
-        u = mozldap.user(entry)
-        users[u.dn] = {'mail': u.mail, 'SSHFingerprints': u.sshPublicKey, 'PGPFingerprints': u.pgpFingerprint}
+        dn, u = mozldap.user(entry)
+        users[dn] = u
 
-    # Intersect all this to find which users belong to which group
-    # Users = {'dn here': 'mail value here', ...}
-    # Groups = {'group name here': ['dn here', ...], ...}
-
-    # Create the list of users per groups. We don't actually currently use this.
-#    grouplist = {}
-#    set_userskey = set(users.keys())
-#    for group in groups:
-#        uing = set(groups[group]) & set_userskey
-#        for u in uing:
-#            if not grouplist.get(group):
-#                grouplist[group] = []
-#            grouplist[group].append(users[u])
-
-    # Same but reverse (find which group belongs to which users). We actually use this ;-)
-    userlist = {}
-    # Prefill so that we include users with no group data and default other attributes
-    for u in users:
-        user = users[u]
-        useremail = user.get('mail')
-        userlist[useremail] = {'groups': [], 'SSHFingerprints': user.get('SSHFingerprints'), 'PGPFingerprints': user.get('PGPFingerprints')}
+    # Find which group belongs to which users and add them
     set_userskey = set(users.keys())
     for group in groups:
         uing = set(groups[group]) & set_userskey
         for u in uing:
-            useremail = users[u]['mail']
-            userlist[useremail]['groups'].append(group)
-
-    # Add user attributes
+            users[u]['groups'].append(group)
 
     logger.debug('Resulting group list:')
-    logger.debug(json.dumps(userlist))
-    userlist_json_str = json.dumps(userlist, ensure_ascii=False).encode('utf-8')
+    logger.debug(json.dumps(users))
+
+    # Validate all user profiles, warn strongly on failure
+    for u in users:
+        if not mozldap.validate_user(users[u]):
+            logger.critical("Profile schema validation failed for user {} - skipped".format(u))
+
+    # Flatten our list of users into a single json string
+    userlist_json_str = json.dumps(users, ensure_ascii=False).encode('utf-8')
 
     # Compare with cache
     changes_detected = True # Default to "we have changes" in case cache does not exist
     try:
         with open(config.aws.s3.cache, 'r') as fd:
             cached = json.load(fd)
-            if (sorted(cached.items()) == sorted(userlist.items())):
+            if (sorted(cached.items()) == sorted(users.items())):
                 logger.debug("No change detected since last run - won't upload to S3")
                 changes_detected = False
             else:
@@ -253,4 +327,4 @@ if __name__ == "__main__":
                 region_name=config.aws.boto.region)
         # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
         xz = lzma.compress(userlist_json_str)
-        s3.put_object(Bucket=config.aws.s3.bucket, Key="ldap.json.xz", Body=xz)
+        s3.put_object(Bucket=config.aws.s3.bucket, Key=config.aws.s3.filename, Body=xz)
