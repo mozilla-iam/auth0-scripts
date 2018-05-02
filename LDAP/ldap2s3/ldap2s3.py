@@ -1,22 +1,27 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+# Ah, python2.
+global python2_detected
+python2_detected = False
+
 import argparse
 import boto3
 from datetime import datetime
 import json
 from ldap3 import Server, Connection, SUBTREE
-import lzma
+try:
+    import lzma
+except ImportError:
+    import backports.lzma as lzma
+    python2_detected = True
 import logging
 import os
 import yaml
 import sys
 import jsonschema
 
-# P2 compat
-try:
-    FileNotFoundError
-except NameError:
+if python2_detected:
     FileNotFoundError = IOError
 
 
@@ -200,9 +205,9 @@ class ldaper():
             user.phoneNumbers.append(p.decode('utf-8'))
 
         # Names
-        user.firstName = self.gfe(attrs, 'givenName').encode('utf8')
-        user.lastName = self.gfe(attrs, 'sn').encode('utf8')
-        user.displayName = "{} {}".format(user.firstName, user.lastName)
+        user.firstName = self.gfe(attrs, 'givenName')
+        user.lastName = self.gfe(attrs, 'sn')
+        user.displayName = u"{} {}".format(user.firstName, user.lastName)
 
         # Times - Profile output format is 2017-03-09T21:28:51.851Z
         dt = entry.get('attributes').get('createTimestamp')
@@ -291,7 +296,20 @@ if __name__ == "__main__":
             logger.critical("Profile schema validation failed for user {} - skipped".format(u))
 
     # Flatten our list of users into a single json string
-    userlist_json_str = json.dumps(users, ensure_ascii=False).encode('utf-8')
+    # So this may look a little weird here, let me explain:
+    # first, we tell json that we want the 'utf8' encoding. That's because python2 will understand that as actual
+    # unicode (utf-8, even). But json has a hardcoded check for 'utf-8' (notice the '-') which doesn't do what you'd
+    # expect. This hardcoded check is bypassed since it won't match 'utf8' (no '-')
+    # Together with `ensure_ascii=False` this will take the correct code path to return a utf-8 string.
+    # Note that because it may also return a non-unicode string if there were no ascii characters found, we also
+    # re-encode to utf-8 *again* so that we pass a unicode string back for sure.
+    # Finally note that python3's version of json does not have this issue!
+    #
+    # See also https://stackoverflow.com/questions/18990021/why-python-json-dumps-complains-about-ascii-decoding/50144465
+    if python2_detected:
+        userlist_json_str = json.dumps(users, encoding="utf8", ensure_ascii=False).encode('utf-8')
+    else:
+        userlist_json_str = json.dumps(users, ensure_ascii=False).encode('utf-8')
 
     # Compare with cache
     changes_detected = True # Default to "we have changes" in case cache does not exist
