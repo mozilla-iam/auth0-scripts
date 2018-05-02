@@ -200,8 +200,8 @@ class ldaper():
             user.phoneNumbers.append(p.decode('utf-8'))
 
         # Names
-        user.firstName = self.gfe(attrs, 'givenName')
-        user.lastName = self.gfe(attrs, 'sn')
+        user.firstName = self.gfe(attrs, 'givenName').encode('utf8')
+        user.lastName = self.gfe(attrs, 'sn').encode('utf8')
         user.displayName = "{} {}".format(user.firstName, user.lastName)
 
         # Times - Profile output format is 2017-03-09T21:28:51.851Z
