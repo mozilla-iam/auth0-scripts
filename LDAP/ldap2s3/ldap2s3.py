@@ -21,7 +21,10 @@ import yaml
 import sys
 import jsonschema
 
-if python2_detected:
+try:
+    FileNotFoundError
+except NameError:
+    python2_detected = True
     FileNotFoundError = IOError
 
 
