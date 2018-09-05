@@ -1,31 +1,159 @@
 {
-	"user_id": "",
-	"timezone": "",
-	"active": true,
-	"lastModified": "",
-	"created": "",
-	"userName": "",
-	"displayName": "",
-	"firstName": "",
-	"lastName": "",
-	"preferredLanguage": "",
-	"primaryEmail": "",
-	"emails": [
-	],
-	"phoneNumbers": [
-	],
-	"uris": [
-	],
-	"nicknames": [
-	],
-	"SSHFingerprints": [
-	],
-	"PGPFingerprints": [
-	],
-	"picture": "",
-	"shirtSize": "",
-	"groups": [
-	],
-	"authoritativeGroups": [
-	]
+  "_schema": "https://person-api.sso.mozilla.com/schema/v2/profile",
+  "user_id": {
+    "metadata": {
+      "publisher": "auth0",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "PUBLIC"
+    },
+    "value": null
+  },
+  "active": {
+    "metadata": {
+      "publisher": "ldap",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "WORKGROUP CONFIDENTIAL"
+    },
+    "value": false
+  },
+  "last_modified": {
+    "metadata": {
+      "publisher": "auth0",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "PUBLIC"
+    },
+    "value": "1971-01-01T00:00:00.000Z"
+  },
+  "created": {
+    "metadata": {
+      "publisher": "auth0",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "PUBLIC"
+    },
+    "value": "1971-01-01T00:00:00.000Z"
+  },
+  "first_name": {
+    "metadata": {
+      "publisher": "mozilliansorg",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "PUBLIC"
+    },
+    "value": null
+  },
+  "last_name": {
+    "metadata": {
+      "publisher": "mozilliansorg",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "PUBLIC"
+    },
+    "value": "McArdle"
+  },
+  "primary_email": {
+    "metadata": {
+      "publisher": "auth0",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "PUBLIC"
+    },
+    "value": null
+  },
+  "phone_numbers": {
+    "metadata": {
+      "publisher": "mozilliansorg",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "MOZILLA CONFIDENTIAL"
+    },
+    "value": []
+  },
+  "ssh_public_keys": {
+    "metadata": {
+      "publisher": "mozilliansorg",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "PUBLIC"
+    },
+    "value": []
+  },
+  "pgp_public_keys": {
+    "metadata": {
+      "publisher": "mozilliansorg",
+      "signatures": [
+        {
+          "name": null,
+          "value": null,
+          "type": "jwks"
+        }
+      ],
+      "classification": "PUBLIC"
+    },
+    "value": []
+  },
+  "access_information": {
+    "ldap": {
+      "metadata": {
+        "publisher": "ldap",
+        "signatures": [
+          {
+            "name": null,
+            "value": null,
+            "type": "jwks"
+          }
+        ],
+        "classification": "PUBLIC"
+      },
+      "value": []
+    }
+  }
 }
