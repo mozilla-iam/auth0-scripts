@@ -150,7 +150,8 @@ class ldaper():
         try:
             jsonschema.validate(user_profile, schema)
             return True
-        except jsonschema.exceptions.ValidationError:
+        except jsonschema.exceptions.ValidationError as e:
+            logger.debug('Validation failure: {}'.format(e))
             return False
 
     def user(self, entry):
@@ -164,7 +165,7 @@ class ldaper():
         dn = self.gfe(entry, 'raw_dn')
 
         # Insert LDAP email as primary email
-        user.primaryEmail = self.gfe(attrs, 'mail')
+        user.primary_email = self.gfe(attrs, 'mail')
         email = {
                   'value': user.primaryEmail,
                   'verified': True,
@@ -173,14 +174,14 @@ class ldaper():
                 }
         user.emails.append(email)
 
-        if not user.primaryEmail or not dn:
-            logger.warning('Invalid user specification dn: {} mail: {}'.format(dn, user.primaryEmail))
+        if not user.primary_email or not dn:
+            logger.warning('Invalid user specification dn: {} mail: {}'.format(dn, user.primary_email))
 
         # Terrible hack to emulate the LDAP user_id
         # This NEEDS to match Auth0 LDAP user_ids
         # XXX Replace this by opaque UUIDs someday, as well as in the Auth0 LDAP Connector
-        user.userName = self.gfe(attrs, 'uid')
-        user.user_id = "{}|{}".format(self.cis_config.user_id_prefix, user.userName)
+        user.username = self.gfe(attrs, 'uid')
+        user.user_id = "{}|{}".format(self.cis_config.user_id_prefix, user.user_name)
 
         # SSH Key
         for k in self.normalize_ssh(attrs.get('sshPublicKey')):
@@ -190,7 +191,7 @@ class ldaper():
                       'primary': True,
                       'name': 'LDAP-imported SSH Public key'
                      }
-            user.SSHFingerprints.append(sshkey)
+            user.ssh_public_keys.append(sshkey)
 
         # PGP Key
         for k in self.normalize_pgp(attrs.get('pgpFingerprint')):
@@ -200,17 +201,16 @@ class ldaper():
                       'primary': True,
                       'name': 'LDAP-imported PGP Public key'
                      }
-            user.PGPFingerprints.append(pgpkey)
+            user.pgp_public_keys.append(pgpkey)
 
         # Phone numbers - note, its not in "telephoneNumber" which is only an extension for VOIP
         phones = attrs.get('mobile')
         for p in phones:
-            user.phoneNumbers.append(p.decode('utf-8'))
+            user.phone_numbers.append(p.decode('utf-8'))
 
         # Names
-        user.firstName = self.gfe(attrs, 'givenName')
-        user.lastName = self.gfe(attrs, 'sn')
-        user.displayName = u"{} {}".format(user.firstName, user.lastName)
+        user.first_name = self.gfe(attrs, 'givenName')
+        user.last_name = self.gfe(attrs, 'sn')
 
         # Times - Profile output format is 2017-03-09T21:28:51.851Z
         dt = entry.get('attributes').get('createTimestamp')
@@ -218,8 +218,8 @@ class ldaper():
         user.created = created
 
         dt = entry.get('attributes').get('modifyTimestamp')
-        lastModified = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
-        user.lastModified = lastModified
+        last_modified = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
+        user.last_modified = last_modified
 
         return (dn, user)
 
