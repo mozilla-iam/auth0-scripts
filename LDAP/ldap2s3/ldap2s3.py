@@ -7,7 +7,6 @@ python2_detected = False
 
 import argparse
 import boto3
-from datetime import datetime
 import json
 from ldap3 import Server, Connection, SUBTREE
 try:
@@ -38,20 +37,45 @@ def setup_logging(stream=sys.stderr, level=logging.INFO):
 
 class DotDict(dict):
     """
-    dict.item notation for dict()'s
+    dict-to-object converter
     """
-    __getattr__ = dict.__getitem__
-    __setattr__ = dict.__setitem__
-    __delattr__ = dict.__delitem__
+    def __init__(self, *args, **kwargs):
+        dict.__init__(self, *args, **kwargs)
+        for k, v in self.iteritems():
+            self.__setitem__(k, v)
 
-    def __init__(self, dct):
-        for key, value in dct.items():
-            if hasattr(value, 'keys'):
-                value = DotDict(value)
-            self[key] = value
+    def __getattr__(self, k):
+        try:
+            return dict.__getitem__(self, k)
+        except KeyError:
+             raise AttributeError( "'DotDict' object has no attribute '" + str(k) + "'")
 
-    def __getstate__(self):
-        return self.__dict__
+    def __setitem__(self, k, v):
+         dict.__setitem__(self, k, DotDict.__convert(v))
+
+    __setattr__ = __setitem__
+
+    def __delattr__(self, k):
+        try:
+            dict.__delitem__(self, k)
+        except KeyError:
+            raise AttributeError("'DotDict'  object has no attribute '" + str(k) + "'")
+
+    @staticmethod
+    def __convert(o):
+        """
+        Recursively convert `dict` objects in `dict`, `list`, `set`, and
+        `tuple` objects to `DotDict` objects.
+        """
+        if isinstance(o, dict):
+            o = DotDict(o)
+        elif isinstance(o, list):
+            o = list(DotDict.__convert(v) for v in o)
+        elif isinstance(o, set):
+            o = set(DotDict.__convert(v) for v in o)
+        elif isinstance(o, tuple):
+            o = tuple(DotDict.__convert(v) for v in o)
+        return o
 
 
 class ldaper():
@@ -165,61 +189,53 @@ class ldaper():
         dn = self.gfe(entry, 'raw_dn')
 
         # Insert LDAP email as primary email
-        user.primary_email = self.gfe(attrs, 'mail')
-        email = {
-                  'value': user.primaryEmail,
-                  'verified': True,
-                  'primary': True,
-                  'name': 'LDAP-imported Email'
-                }
-        user.emails.append(email)
+        user.primary_email.value = self.gfe(attrs, 'mail')
+        if not user.primary_email.value or not dn:
+            logger.warning('Invalid user specification dn: {} mail: {}'.format(dn, user.primary_email.value))
 
-        if not user.primary_email or not dn:
-            logger.warning('Invalid user specification dn: {} mail: {}'.format(dn, user.primary_email))
+        # LDAP is our reserved key
+        user.identities['values']['LDAP'] = user.primary_email.value
 
         # Terrible hack to emulate the LDAP user_id
         # This NEEDS to match Auth0 LDAP user_ids
         # XXX Replace this by opaque UUIDs someday, as well as in the Auth0 LDAP Connector
-        user.username = self.gfe(attrs, 'uid')
-        user.user_id = "{}|{}".format(self.cis_config.user_id_prefix, user.user_name)
+        ldap_user_uid = self.gfe(attrs, 'uid')
+        user.usernames['values']['LDAP'] = ldap_user_uid
+        user.user_id['value'] = "{}|{}".format(self.cis_config.user_id_prefix, ldap_user_uid)
 
         # SSH Key
+        # Named: "LDAP-1" "LDAP-2", etc.
+        n = 0
         for k in self.normalize_ssh(attrs.get('sshPublicKey')):
-            sshkey = {
-                      'value': k,
-                      'verified': False,
-                      'primary': True,
-                      'name': 'LDAP-imported SSH Public key'
-                     }
-            user.ssh_public_keys.append(sshkey)
+            n = n + 1
+            user.ssh_public_keys['values']['LDAP-{}'.format(n)] = k
 
         # PGP Key
+        # Same naming format as SSH
+        n = 0
         for k in self.normalize_pgp(attrs.get('pgpFingerprint')):
-            pgpkey = {
-                      'value': k,
-                      'verified': False,
-                      'primary': True,
-                      'name': 'LDAP-imported PGP Public key'
-                     }
-            user.pgp_public_keys.append(pgpkey)
+            n = n +1
+            user.pgp_public_keys['values']['LDAP-{}'.format(n)] = k
 
         # Phone numbers - note, its not in "telephoneNumber" which is only an extension for VOIP
         phones = attrs.get('mobile')
+        n = 0
         for p in phones:
-            user.phone_numbers.append(p.decode('utf-8'))
+            n = n + 1
+            user.phone_numbers['values']['LDAP-{}'.format(n)] = p.decode('utf-8')
 
         # Names
-        user.first_name = self.gfe(attrs, 'givenName')
-        user.last_name = self.gfe(attrs, 'sn')
+        user.first_name['value'] = self.gfe(attrs, 'givenName')
+        user.last_name['value'] = self.gfe(attrs, 'sn')
 
         # Times - Profile output format is 2017-03-09T21:28:51.851Z
         dt = entry.get('attributes').get('createTimestamp')
         created = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
-        user.created = created
+        user.created['value'] = created
 
         dt = entry.get('attributes').get('modifyTimestamp')
-        last_modified = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
-        user.last_modified = last_modified
+        last_modified = dt.strftime('%Y-%m-%dT:%H:%M:%SZ')
+        user.last_modified.value = last_modified
 
         return (dn, user)
 
@@ -288,7 +304,8 @@ if __name__ == "__main__":
     for group in groups:
         uing = set(groups[group]) & set_userskey
         for u in uing:
-            users[u]['groups'].append(group)
+            # 'null' indicates a new group with no specific value attached to it (ie the group exists)
+            users[u]['access_information']['ldap']['values'][group] = 'null'
 
     logger.debug('Resulting group list:')
     logger.debug(json.dumps(users))
