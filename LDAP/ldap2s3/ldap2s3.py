@@ -37,12 +37,20 @@ def setup_logging(stream=sys.stderr, level=logging.INFO):
 
 class DotDict(dict):
     """
-    dict-to-object converter
+    Convert a dict to a class/object with attributes, such as:
+    test = dict({"test": {"value": 1}})
+    test.test.value = 2
     """
     def __init__(self, *args, **kwargs):
         dict.__init__(self, *args, **kwargs)
-        for k, v in self.iteritems():
-            self.__setitem__(k, v)
+        try:
+            #Python2
+            for k, v in self.iteritems():
+                self.__setitem__(k, v)
+        except AttributeError:
+            #Python3
+            for k, v in self.items():
+                self.__setitem__(k, v)
 
     def __getattr__(self, k):
         try:
