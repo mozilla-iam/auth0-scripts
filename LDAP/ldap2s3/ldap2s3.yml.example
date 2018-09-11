@@ -9,8 +9,6 @@ ldap:
         groups: "(objectClass=groupOfNames)"
         users: "(&(!(employeeType=DISABLED))(objectClass=inetOrgPerson)(|(o:dn:=org)(o:dn:=com)(o:dn:=net)(ou:dn:=shared_accounts)))"
 cis:
-    schema: 'profile.schema'
-    skeleton: 'user_profile_core_plus_extended.json'
     user_id_prefix: 'ad|Mozilla-LDAP'
 aws:
     boto:
