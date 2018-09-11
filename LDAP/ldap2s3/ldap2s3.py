@@ -7,7 +7,6 @@ python2_detected = False
 
 import argparse
 import boto3
-from dotdict import DotDict
 import json
 from ldap3 import Server, Connection, SUBTREE
 try:
@@ -16,6 +15,7 @@ except ImportError:
     import backports.lzma as lzma
     python2_detected = True
 import logging
+import moz_iam_profile
 import os
 import yaml
 import sys
@@ -39,23 +39,7 @@ def setup_logging(stream=sys.stderr, level=logging.INFO):
 class ldaper():
     def __init__(self, uri, user, password, cis_config):
         global logger
-        # This could use the IAM profile eventually if we wanted, with schema validation
-        # That said for now we only care about groups
-
-        # Read the user profile in a string but don't parse it yet to avoid having
-        # To copy a bunch of dicts, which would cause MemoryError exceptions
-        profile_file = cis_config.skeleton
-        try:
-            with open(profile_file) as fd:
-                self.userprofile_json = fd.read()
-        except FileNotFoundError:
-            logger.critical("FATAL: Could not find default profile file: {}. Please check configuration."
-                            .format(profile_file))
-            sys.exit(127)
-            return # Not reached
-
         self.cis_config = cis_config
-
         self.connect(uri, user, password)
 
     def connect(self, uri, user, password):
@@ -116,31 +100,11 @@ class ldaper():
 
         return ret
 
-    def validate_user(self, user_profile):
-        """
-        Validate a user profile against CIS profile
-        Returns True if the profile validate, False if not.
-        @user_profile: dict
-        """
-        schema_file = self.cis_config.schema
-        try:
-            with open(schema_file) as fd:
-                schema = json.load(fd)
-        except FileNotFoundError:
-            return False
-
-        try:
-            jsonschema.validate(user_profile, schema)
-            return True
-        except jsonschema.exceptions.ValidationError as e:
-            logger.debug('Validation failure: {}'.format(e))
-            return False
-
     def user(self, entry):
         """
         Finds canonical LDAP data for that user
         """
-        user = DotDict(json.loads(self.userprofile_json))
+        user = moz_iam_profile.User()
 
         # Add LDAP attributes
         attrs = entry.get('raw_attributes')
@@ -202,7 +166,7 @@ class ldaper():
         """
         Finds canonical LDAP data for that group
         """
-        group = DotDict(dict())
+        group = moz_iam_profile.DotDict()
         attrs = entry.get('raw_attributes')
         group.name = self.gfe(attrs, 'cn')
         group.members = []
@@ -229,7 +193,7 @@ if __name__ == "__main__":
     else:
         logger = setup_logging(level=logging.INFO)
     with open(args.config or 'ldap2s3.yml') as fd:
-        config = DotDict(yaml.load(fd))
+        config = moz_iam_profile.DotDict(yaml.load(fd))
 
 
     mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis)
@@ -253,9 +217,18 @@ if __name__ == "__main__":
                                                                    'createTimestamp', 'modifyTimestamp'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     # Create the list of all users
+    # Only add the ones that validate correctly, else issue a loud critical warning
     for entry in sgen:
         dn, u = mozldap.user(entry)
-        users[dn] = u
+        try:
+            validation = u.validate()
+        except:
+            logger.debug(validation)
+            logger.critical("Profile schema validation failed for user {} - skipped".format(u))
+            continue
+
+        # From now on, we deal with a dict instead of an object so that we can flatten everything to JSON at once
+        users[dn] = u.as_dict()
 
     # Find which group belongs to which users and add them
     set_userskey = set(users.keys())
@@ -263,15 +236,7 @@ if __name__ == "__main__":
         uing = set(groups[group]) & set_userskey
         for u in uing:
             # 'null' indicates a new group with no specific value attached to it (ie the group exists)
-            users[u]['access_information']['ldap']['values'][group] = 'null'
-
-    logger.debug('Resulting group list:')
-    logger.debug(json.dumps(users))
-
-    # Validate all user profiles, warn strongly on failure
-    for u in users:
-        if not mozldap.validate_user(users[u]):
-            logger.critical("Profile schema validation failed for user {} - skipped".format(u))
+            users[u]['access_information']['ldap']['values'][group] = None
 
     # Flatten our list of users into a single json string
     # So this may look a little weird here, let me explain:
