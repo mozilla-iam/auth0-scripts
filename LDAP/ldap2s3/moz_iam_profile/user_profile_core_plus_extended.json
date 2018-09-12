@@ -46,7 +46,7 @@
       "publisher_authority": "access_provider",
       "verified": true
     },
-    "value": "Mozilla-LDAP"
+    "value": null
   },
   "active": {
     "signature": {
@@ -416,7 +416,7 @@
       "publisher_authority": "mozilliansorg",
       "verified": false
     },
-    "value": "Dum own title"
+    "value": null
   },
   "description": {
     "signature": {
