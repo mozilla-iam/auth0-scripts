@@ -6,6 +6,7 @@ global python2_detected
 python2_detected = False
 
 import argparse
+import base64
 import boto3
 import json
 from ldap3 import Server, Connection, SUBTREE
@@ -70,7 +71,8 @@ class ldaper():
         myval = data.get(val)
         if type(myval) is list:
             if len(myval) == 0:
-                logger.debug('Missing required attribute during conversion of "{}": {}'.format(data, myval))
+                # This happens too often to even print in debug, but if you need it, its there
+                #logger.debug('Missing required attribute during conversion of "{}": {}'.format(data, myval))
                 return None
             myval = myval[0]
 
@@ -118,12 +120,21 @@ class ldaper():
         # LDAP is our reserved key
         user.identities['values']['LDAP'] = user.primary_email.value
 
+        # Login method
+        user.login_method.value = self.cis_config.connection
+
         # Terrible hack to emulate the LDAP user_id
         # This NEEDS to match Auth0 LDAP user_ids
         # XXX Replace this by opaque UUIDs someday, as well as in the Auth0 LDAP Connector
         ldap_user_uid = self.gfe(attrs, 'uid')
         user.usernames['values']['LDAP'] = ldap_user_uid
         user.user_id['value'] = "{}|{}".format(self.cis_config.user_id_prefix, ldap_user_uid)
+
+        n = 0
+        for alias in attrs.get('emailAlias'):
+            n = n + 1
+            alias_dec = alias.decode('utf-8')
+            user.identities['values']['LDAP-alias-{}'.format(n)] = alias_dec
 
         # SSH Key
         # Named: "LDAP-1" "LDAP-2", etc.
@@ -149,6 +160,37 @@ class ldaper():
         # Names
         user.first_name['value'] = self.gfe(attrs, 'givenName')
         user.last_name['value'] = self.gfe(attrs, 'sn')
+        alternative_name = self.gfe(attrs, 'displayName')
+        if alternative_name is not None:
+            user.alternative_name['value'] = alternative_name
+
+        # Fun title
+        user.fun_title.value = self.gfe(attrs, 'title')
+
+        # Usernames
+        ## Unix id / "posix uid" i.e. usernames and their declared integer (eg kang: 1000)
+        unix_id = self.gfe(attrs, 'uid')
+        unix_uid_int = self.gfe(attrs, 'uidNumber')
+        if unix_id is not None:
+            user.usernames['values'] = {'LDAP-posix_id': unix_id, 'LDAP-posix_uid': unix_uid_int}
+        # other nick/usernames, unverified
+        n = 0
+        for im_name in attrs.get('im'):
+            n = n + 1
+            user.usernames['values']['LDAP-im-unverified-{}'.format(n)] = im_name.decode('utf-8')
+
+        # Description / free form text from the user
+        description = self.gfe(attrs, 'description')
+        user.description.value = description
+
+        # Picture - normally its a URL but since we get data we drop it here anyway
+        picture = attrs.get('jpegPhoto')
+        if len(picture) > 0:
+            ## At least, lets make this base64
+            if python2_detected:
+                user.picture.value = base64.b64encode(picture[0])
+            else:
+                user.picture.value = base64.b64encode(picture[0].encode('utf-8'))
 
         # Times - Profile output format is 2017-03-09T21:28:51.851Z
         dt = entry.get('attributes').get('createTimestamp')
@@ -209,12 +251,22 @@ if __name__ == "__main__":
         groups[g.name] = g.members
 
     # Find user emails for all users
+    # The attributes here are what we really extract from LDAP. See `def user` for how they're parsed and mapped to the
+    # IAM profiles
+    #
+    # im is a list of instant messaging nicknames, usually irc
+    # jpegPhoto is raw jpeg data
+    # displayName is a custom name (unlike givenName, sn)
+    # uid is the posix uid and uidNumber is the posix uid's integer
+    # title is an unofficial title set by the user
     users = {}
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
                                                      attributes = ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
-                                                                   'givenName', 'mobile', 'uid',
-                                                                   'createTimestamp', 'modifyTimestamp'],
+                                                                   'givenName', 'mobile', 'uid', 'uidNumber',
+                                                                   'createTimestamp', 'modifyTimestamp', 'jpegPhoto',
+                                                                   'im', 'displayName', 'title',
+                                                                   'description', 'emailAlias'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     # Create the list of all users
     # Only add the ones that validate correctly, else issue a loud critical warning
@@ -222,9 +274,9 @@ if __name__ == "__main__":
         dn, u = mozldap.user(entry)
         try:
             validation = u.validate()
-        except:
-            logger.debug(validation)
+        except Exception as e:
             logger.critical("Profile schema validation failed for user {} - skipped".format(u))
+            logger.debug("validation data: {}".format(e))
             continue
 
         # From now on, we deal with a dict instead of an object so that we can flatten everything to JSON at once
