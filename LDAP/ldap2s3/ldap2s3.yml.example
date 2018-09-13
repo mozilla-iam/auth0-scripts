@@ -11,6 +11,7 @@ ldap:
 cis:
     connection: 'Mozilla-LDAP'
     user_id_prefix: 'ad|Mozilla-LDAP'
+    local_pictures_folder: "pictures"
 aws:
     boto:
         access_key_id: ""
@@ -19,4 +20,5 @@ aws:
     s3:
         bucket: "dev-cis-ldap2s3-publisher-data"
         filename: "ldap-full-profile.json.xz"
+        pictures_folder: "pictures"
         cache: "/var/tmp/ldap2s3-cache.json"

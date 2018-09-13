@@ -6,7 +6,6 @@ global python2_detected
 python2_detected = False
 
 import argparse
-import base64
 import boto3
 import json
 from ldap3 import Server, Connection, SUBTREE
@@ -131,7 +130,7 @@ class ldaper():
         user.user_id['value'] = "{}|{}".format(self.cis_config.user_id_prefix, ldap_user_uid)
 
         n = 0
-        for alias in attrs.get('emailAlias'):
+        for alias in attrs.get('zimbraAlias'):
             n = n + 1
             alias_dec = alias.decode('utf-8')
             user.identities['values']['LDAP-alias-{}'.format(n)] = alias_dec
@@ -183,14 +182,16 @@ class ldaper():
         description = self.gfe(attrs, 'description')
         user.description.value = description
 
-        # Picture - normally its a URL but since we get data we drop it here anyway
+        # Picture - this takes an URI so we're technically correct here, though this isn't exactly useable by all
+        # as you need to be able to address the picture URI
         picture = attrs.get('jpegPhoto')
         if len(picture) > 0:
-            ## At least, lets make this base64
-            if python2_detected:
-                user.picture.value = base64.b64encode(picture[0])
-            else:
-                user.picture.value = base64.b64encode(picture[0].encode('utf-8'))
+            picture_path = "{}/{}.jpg".format(self.cis_config.local_pictures_folder, user.user_id.value)
+            #save picture to disk
+            with open(picture_path, 'w') as fd:
+                fd.write(picture[0])
+            picture_uri = "file:///{}".format(picture_path)
+            user.picture.value = picture_path
 
         # Times - Profile output format is 2017-03-09T21:28:51.851Z
         dt = entry.get('attributes').get('createTimestamp')
@@ -229,6 +230,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', action="store_true", help='Turns on debug logging')
     parser.add_argument('-f', '--force', action="store_true", help='Force sending to S3 even if there was no change detected')
     parser.add_argument('-s', '--sends3', action="store_true", help='Sends results to AWS S3 as lzma\'d JSON')
+    parser.add_argument('-p', '--sends3pictures', action="store_true", help='Sends user pictures to AWS S3 as well, in jpeg (this is a lot more data)')
     args = parser.parse_args()
     if args.debug:
         logger = setup_logging(level=logging.DEBUG)
@@ -254,6 +256,7 @@ if __name__ == "__main__":
     # The attributes here are what we really extract from LDAP. See `def user` for how they're parsed and mapped to the
     # IAM profiles
     #
+    # zimbraAlias is a list of admin-provided email aliases for the users. The name is historical.
     # im is a list of instant messaging nicknames, usually irc
     # jpegPhoto is raw jpeg data
     # displayName is a custom name (unlike givenName, sn)
@@ -266,7 +269,7 @@ if __name__ == "__main__":
                                                                    'givenName', 'mobile', 'uid', 'uidNumber',
                                                                    'createTimestamp', 'modifyTimestamp', 'jpegPhoto',
                                                                    'im', 'displayName', 'title',
-                                                                   'description', 'emailAlias'],
+                                                                   'description', 'zimbraAlias'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     # Create the list of all users
     # Only add the ones that validate correctly, else issue a loud critical warning
@@ -341,3 +344,14 @@ if __name__ == "__main__":
         # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
         xz = lzma.compress(userlist_json_str)
         s3.put_object(Bucket=config.aws.s3.bucket, Key=config.aws.s3.filename, Body=xz)
+        if args.sends3pictures:
+            # also send pictures
+            logger.debug('Sending pictures to AWS S3')
+            for picture in os.listdir(config.cis.local_pictures_folder):
+                if os.path.isfile(picture):
+                    with open('{}/{}'.format(config.cis.local_pictures_older, picture), 'r') as fd:
+                        picture_data = fd.read()
+                    s3.put_object(Bucket=config.aws.s3.bucket,
+                                  Key='{}/{}'.format(config.aws.s3.pictures_folder, picture),
+                                  Body=picture_data
+                                 )
