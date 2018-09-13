@@ -4,13 +4,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -28,13 +28,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -52,13 +52,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -76,13 +76,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -100,13 +100,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -124,13 +124,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -149,13 +149,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -173,13 +173,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -197,13 +197,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -221,13 +221,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -246,13 +246,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -271,13 +271,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -297,13 +297,13 @@
       "signature": {
         "publisher": {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         },
         "additional": [
           {
             "alg": "RS256",
-            "typ": "JWT",
+            "typ": "JWS",
             "value": ""
           }
         ]
@@ -322,13 +322,13 @@
       "signature": {
         "publisher": {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         },
         "additional": [
           {
             "alg": "RS256",
-            "typ": "JWT",
+            "typ": "JWS",
             "value": ""
           }
         ]
@@ -347,13 +347,13 @@
       "signature": {
         "publisher": {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         },
         "additional": [
           {
             "alg": "RS256",
-            "typ": "JWT",
+            "typ": "JWS",
             "value": ""
           }
         ]
@@ -372,13 +372,13 @@
       "signature": {
         "publisher": {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         },
         "additional": [
           {
             "alg": "RS256",
-            "typ": "JWT",
+            "typ": "JWS",
             "value": ""
           }
         ]
@@ -398,13 +398,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -422,13 +422,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -446,13 +446,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -470,13 +470,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -494,13 +494,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -518,13 +518,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -543,13 +543,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -568,13 +568,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -592,13 +592,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -616,13 +616,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -641,13 +641,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
@@ -666,13 +666,13 @@
     "signature": {
       "publisher": {
         "alg": "RS256",
-        "typ": "JWT",
+        "typ": "JWS",
         "value": ""
       },
       "additional": [
         {
           "alg": "RS256",
-          "typ": "JWT",
+          "typ": "JWS",
           "value": ""
         }
       ]
