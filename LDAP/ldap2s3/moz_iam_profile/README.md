@@ -15,3 +15,8 @@ skel_user.user_id.value = "notbobsmith"
 if skel_user.validate():
   profile = skel_user.as_json()
 ```
+
+## TODO
+- write tests
+- rename to cis_profile and move to cis repos
+- fetch schema and cache a copy instead of having a copy in the repos
