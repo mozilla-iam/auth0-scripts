@@ -191,7 +191,7 @@ class ldaper():
             with open(picture_path, 'w') as fd:
                 fd.write(picture[0])
             picture_uri = "file:///{}".format(picture_path)
-            user.picture.value = picture_path
+            user.picture.value = picture_uri
 
         # Times - Profile output format is 2017-03-09T21:28:51.851Z
         dt = entry.get('attributes').get('createTimestamp')
@@ -346,12 +346,13 @@ if __name__ == "__main__":
         s3.put_object(Bucket=config.aws.s3.bucket, Key=config.aws.s3.filename, Body=xz)
         if args.sends3pictures:
             # also send pictures
-            logger.debug('Sending pictures to AWS S3')
+            logger.debug('Sending pictures to AWS S3 from directory {}'.format(config.cis.local_pictures_folder))
             for picture in os.listdir(config.cis.local_pictures_folder):
-                if os.path.isfile(picture):
-                    with open('{}/{}'.format(config.cis.local_pictures_older, picture), 'r') as fd:
+                p = '{}/{}'.format(config.cis.local_pictures_folder, picture)
+                if os.path.isfile(p):
+                    with open(p, 'r') as fd:
                         picture_data = fd.read()
-                    s3.put_object(Bucket=config.aws.s3.bucket,
+                    x=s3.put_object(Bucket=config.aws.s3.bucket,
                                   Key='{}/{}'.format(config.aws.s3.pictures_folder, picture),
                                   Body=picture_data
                                  )
