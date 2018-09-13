@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
+import cis_crypto.operation
 import json
 import jsonschema
 import os
 import time
+
 
 class DotDict(dict):
     """
@@ -145,3 +147,65 @@ class User(object):
             path = schema_file
 
         return jsonschema.validate(self.as_dict(), json.load(open(path)))
+
+    def sign_all(self):
+        """
+        Sign all child nodes with a non-null or non-empty value(s)
+        This requires cis_crypto to be properly setup (i.e. with keys)
+        """
+
+        for item in self.__dict__:
+            if type(self.__dict__[item]) is not DotDict: continue
+            try:
+                attr = self.__dict__[item]
+                if self._attribute_value_set(attr):
+                    attr = self._sign_attribute(attr)
+            except KeyError:
+                # This is the 2nd level attribute match, see also initialize_timestamps()
+                for subitem in self.__dict__[item]:
+                    attr = self.__dict__[item][subitem]
+                    if self._attribute_value_set(attr):
+                        attr = self._sign_attribute(attr)
+
+    def _attribute_value_set(self, attr):
+        """
+        Checks if an attribute is used/set, ie not null or empty
+        @attr a complete CIS Profilev2 attribute (such as {'test': {'value': null}})
+        returns: True if the attribute has a value, False if not
+        """
+        if 'value' in attr:
+            if attr['value'] is None:
+                return False
+            elif isinstance(attr['value'], bool):
+                return True
+            elif len(attr['value']) == 0:
+                return False
+        elif 'values' in attr:
+            if attr['values'] is None:
+                return False
+            elif len(attr['values']) == 0:
+                return False
+        else:
+            raise KeyError(attr)
+        return True
+
+    def _sign_attribute(self, attr):
+        """
+        Perform the actual signature operation
+        See also https://github.com/mozilla-iam/cis/blob/profilev2/docs/Profiles.md
+        @attr: a CIS Profilev2 attribute
+        """
+        signop = cis_crypto.operation.Sign()
+
+        # Extract the attribute without the signature structure itself
+        attrnosig = attr.copy()
+        del attrnosig['signature']
+        signop.load(attrnosig)
+
+        # Add the signed attribute back to the original complete attribute structure (with the signature struct)
+        # This ensure we also don't touch any existing non-publisher signatures
+        sigattr = attr['signature']['publisher']
+        sigattr['alg'] = 'RS256' # Currently hardcoded in cis_crypto
+        sigattr['typ'] = 'JWS'   # ""
+        sigattr['value'] = signop.jws()
+        return attr
