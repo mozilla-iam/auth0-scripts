@@ -23,12 +23,18 @@ example) while otherwise it should be triggered per event with a group filter an
 This means if 3 group changes for different or the same group happen within a 5s delay, these are aggregated and only
 one query is run.
 
+Note as well that fetching images (`jpegPhoto`) is a somewhat slower operation and generates a lot of data (600megs at
+the time of writing), and is thus a separate option. It is considered acceptable to run the script with the `-p` (send
+pictures to s3) option more rarely. For example you may send the potentially-updated JSON file every minute, but only
+send pictures every 15min.
+
 # Usage & Setup
 
 - Create a bucket
 - Create an IAM user and associated role & policy so that it can write to the bucket (see `s3_policy.json`)
 - Edit ldap2s3.yml (create it if needed by copying the example) and set all parameters
-- Generate an AWS access key and run the script (with `-s` to send to S3): `$ ./ldap2s3.py -s`
+- Generate an AWS access key and run the script (with `-s` to send to S3, `-p` to include pictures): `$ ./ldap2s3.py -s
+  -p`
 
 Note: all defaults pertain to Mozilla's specific LDAP setup and will probably not work out of the box elsewhere.
 
