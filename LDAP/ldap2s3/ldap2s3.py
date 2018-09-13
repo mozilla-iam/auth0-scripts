@@ -276,6 +276,13 @@ if __name__ == "__main__":
     for entry in sgen:
         dn, u = mozldap.user(entry)
         try:
+            # Sign all the fields we filled in
+            u.sign_all()
+        except Exception as e:
+            logger.critical("Profile data signing failed for user {} - skipped".format(u))
+            continue
+
+        try:
             validation = u.validate()
         except Exception as e:
             logger.critical("Profile schema validation failed for user {} - skipped".format(u))
