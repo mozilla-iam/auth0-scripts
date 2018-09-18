@@ -230,7 +230,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', action="store_true", help='Turns on debug logging')
     parser.add_argument('-f', '--force', action="store_true", help='Force sending to S3 even if there was no change detected')
     parser.add_argument('-s', '--sends3', action="store_true", help='Sends results to AWS S3 as lzma\'d JSON')
-    parser.add_argument('-p', '--sends3pictures', action="store_true", help='Sends user pictures to AWS S3 as well, in jpeg (this is a lot more data)')
+    parser.add_argument('-p', '--sends3pictures', action="store_true", help='Gets & sends user pictures to AWS S3 as well, in jpeg (this is a lot more data)')
     args = parser.parse_args()
     if args.debug:
         logger = setup_logging(level=logging.DEBUG)
@@ -263,13 +263,16 @@ if __name__ == "__main__":
     # uid is the posix uid and uidNumber is the posix uid's integer
     # title is an unofficial title set by the user
     users = {}
+    attributes_to_get =  ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
+                          'givenName', 'mobile', 'uid', 'uidNumber',
+                          'createTimestamp', 'modifyTimestamp',
+                          'im', 'displayName', 'title',
+                          'description', 'zimbraAlias']
+    if args.sends3pictures:
+        attributes_to_get.append('jpegPhoto')
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
-                                                     attributes = ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
-                                                                   'givenName', 'mobile', 'uid', 'uidNumber',
-                                                                   'createTimestamp', 'modifyTimestamp', 'jpegPhoto',
-                                                                   'im', 'displayName', 'title',
-                                                                   'description', 'zimbraAlias'],
+                                                     attributes = attributes_to_get,
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     # Create the list of all users
     # Only add the ones that validate correctly, else issue a loud critical warning
