@@ -19,3 +19,4 @@ PyYAML==3.12
 s3transfer==0.1.13
 six==1.11.0
 text-unidecode==1.2
+cis_profile==0.0.1

@@ -15,7 +15,7 @@ except ImportError:
     import backports.lzma as lzma
     python2_detected = True
 import logging
-import moz_iam_profile
+import cis_profile
 import os
 import yaml
 import sys
@@ -105,7 +105,7 @@ class ldaper():
         """
         Finds canonical LDAP data for that user
         """
-        user = moz_iam_profile.User()
+        user = cis_profile.User()
 
         # Add LDAP attributes
         attrs = entry.get('raw_attributes')
@@ -209,7 +209,7 @@ class ldaper():
         """
         Finds canonical LDAP data for that group
         """
-        group = moz_iam_profile.DotDict()
+        group = cis_profile.DotDict()
         attrs = entry.get('raw_attributes')
         group.name = self.gfe(attrs, 'cn')
         group.members = []
@@ -237,7 +237,7 @@ if __name__ == "__main__":
     else:
         logger = setup_logging(level=logging.INFO)
     with open(args.config or 'ldap2s3.yml') as fd:
-        config = moz_iam_profile.DotDict(yaml.load(fd))
+        config = cis_profile.DotDict(yaml.load(fd))
 
 
     mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis)
