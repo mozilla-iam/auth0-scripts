@@ -37,10 +37,18 @@ def setup_logging(stream=sys.stderr, level=logging.INFO):
 
 
 class ldaper():
-    def __init__(self, uri, user, password, cis_config):
+    def __init__(self, uri, user, password, cis_config, cache):
         global logger
         self.cis_config = cis_config
         self.connect(uri, user, password)
+        self.cache = cache
+
+    def user_from_cache(self, user_dn):
+        try:
+            user_cached = self.cache[user_dn]
+        except KeyError:
+            user_cached = None
+        return user_cached
 
     def connect(self, uri, user, password):
         server = Server(uri)
@@ -105,11 +113,17 @@ class ldaper():
         """
         Finds canonical LDAP data for that user
         """
-        user = cis_profile.User()
-
-        # Add LDAP attributes
+        # Get LDAP attributes we'll work on + dn
         attrs = entry.get('raw_attributes')
         dn = self.gfe(entry, 'raw_dn')
+
+        # if we have cache, use it
+        # else, use a new empty user profile
+        cached_user = self.user_from_cache(dn)
+        if (len(cached_user) > 1):
+            user = cis_profile.User(user_structure_json=cached_user)
+        else:
+            user = cis_profile.User()
 
         # Insert LDAP email as primary email
         user.primary_email.value = self.gfe(attrs, 'mail')
@@ -185,7 +199,7 @@ class ldaper():
         # Picture - this takes an URI so we're technically correct here, though this isn't exactly useable by all
         # as you need to be able to address the picture URI
         picture = attrs.get('jpegPhoto')
-        if len(picture) > 0:
+        if picture is not None and len(picture) > 0:
             picture_path = "{}/{}.jpg".format(self.cis_config.local_pictures_folder, user.user_id.value)
             #save picture to disk
             with open(picture_path, 'w') as fd:
@@ -193,16 +207,37 @@ class ldaper():
             picture_uri = "file:///{}".format(picture_path)
             user.picture.value = picture_uri
 
-        # Times - Profile output format is 2017-03-09T21:28:51.851Z
-        dt = entry.get('attributes').get('createTimestamp')
-        created = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
-        user.created['value'] = created
+        # Check if the created user is different from cache, if not, just use the cache
+        # If yes, update timestamps, sign values, validate and replace cache (the sign operation takes significant CPU resources)
+        if user.as_dict() == cached_user:
+            dict_user = cached_user
+        else:
+            logger.debug("Cache miss, updating and signing new user data for {}".format(dn))
+            # Times - Profile output format is 2017-03-09T21:28:51.851Z
+            dt = entry.get('attributes').get('createTimestamp')
+            created = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
+            user.created['value'] = created
 
-        dt = entry.get('attributes').get('modifyTimestamp')
-        last_modified = dt.strftime('%Y-%m-%dT:%H:%M:%SZ')
-        user.last_modified.value = last_modified
+            dt = entry.get('attributes').get('modifyTimestamp')
+            last_modified = dt.strftime('%Y-%m-%dT:%H:%M:%SZ')
+            user.last_modified.value = last_modified
 
-        return (dn, user)
+            try:
+                user.sign_all()
+            except Exception as e:
+                logger.critical("Profile data signing failed for user {} - skipped signing, verification WILL "
+                                "FAIL".format(dn))
+
+            # Validate user is correct
+            try:
+                validation = user.validate()
+            except Exception as e:
+                logger.critical("Profile schema validation failed for user {} - skipped".format(dn))
+                logger.debug("validation data: {}".format(e))
+
+            dict_user = user.as_dict()
+
+        return (dn, dict_user)
 
     def group(self, entry):
         # Note we cannot rely on the mail= part of the dn here, so we don't
@@ -222,6 +257,21 @@ class ldaper():
         return group
 
 
+def cache_load(cache_path):
+    cached = {}
+    try:
+        with open(cache_path, 'r') as fd:
+            cached = json.load(fd)
+    except FileNotFoundError:
+        logger.debug("No existing cache found")
+
+    return cached
+
+def cache_write(cache_path, data):
+    with open(cache_path, 'wb') as fd:
+        fd.write(data)
+
+
 if __name__ == "__main__":
     global logger
     os.environ['TZ'] = 'UTC' # Override timezone so we know where we're at
@@ -239,8 +289,9 @@ if __name__ == "__main__":
     with open(args.config or 'ldap2s3.yml') as fd:
         config = cis_profile.DotDict(yaml.load(fd))
 
-
-    mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis)
+    # Load any existing cached data we can use
+    cached = cache_load(config.aws.s3.cache)
+    mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis, cached)
 
     # List all groups
     groups = {}
@@ -252,9 +303,8 @@ if __name__ == "__main__":
         g = mozldap.group(entry)
         groups[g.name] = g.members
 
-    # Find user emails for all users
-    # The attributes here are what we really extract from LDAP. See `def user` for how they're parsed and mapped to the
-    # IAM profiles
+    # Find user emails for all users - attributes_to_get are what's actually queried from LDAP
+    # See `def user` for how they're parsed and mapped to the IAM profiles
     #
     # zimbraAlias is a list of admin-provided email aliases for the users. The name is historical.
     # im is a list of instant messaging nicknames, usually irc
@@ -270,30 +320,18 @@ if __name__ == "__main__":
                           'description', 'zimbraAlias']
     if args.sends3pictures:
         attributes_to_get.append('jpegPhoto')
+
+    # Lookup all entries in LDAP
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
                                                      attributes = attributes_to_get,
-                                                     search_scope=SUBTREE, paged_size=10, generator=True)
+                                                     search_scope=SUBTREE, paged_size=100, generator=True)
     # Create the list of all users
-    # Only add the ones that validate correctly, else issue a loud critical warning
     for entry in sgen:
+        # This returns a dn + dict (not JSON)
         dn, u = mozldap.user(entry)
-        try:
-            # Sign all the fields we filled in
-            u.sign_all()
-        except Exception as e:
-            logger.critical("Profile data signing failed for user {} - skipped".format(u))
-            continue
-
-        try:
-            validation = u.validate()
-        except Exception as e:
-            logger.critical("Profile schema validation failed for user {} - skipped".format(u))
-            logger.debug("validation data: {}".format(e))
-            continue
-
-        # From now on, we deal with a dict instead of an object so that we can flatten everything to JSON at once
-        users[dn] = u.as_dict()
+        users[dn] = u
+        logger.debug("Processed user {}".format(dn))
 
     # Find which group belongs to which users and add them
     set_userskey = set(users.keys())
@@ -321,23 +359,15 @@ if __name__ == "__main__":
 
     # Compare with cache
     changes_detected = True # Default to "we have changes" in case cache does not exist
-    try:
-        with open(config.aws.s3.cache, 'r') as fd:
-            cached = json.load(fd)
-            if (sorted(cached.items()) == sorted(users.items())):
-                logger.debug("No change detected since last run - won't upload to S3")
-                changes_detected = False
-            else:
-                logger.debug("Changes have been detected since last run")
-                changes_detected = True
-    except FileNotFoundError:
-        logger.debug("No cache found, interpreting result as: changes are detected")
+    if len(cached) > 1:
+        if (sorted(cached.items()) == sorted(users.items())):
+            logger.debug("No change detected since last run - won't upload to S3")
+            changes_detected = False
 
     # Write new version to cache
     if changes_detected:
-        with open(config.aws.s3.cache, 'wb') as fd:
-            fd.write(userlist_json_str)
-            logger.debug("Updated cache")
+        cache_write(config.aws.s3.cache, userlist_json_str)
+        logger.debug("Updated cache")
 
     if args.force:
         logger.warning("Forcing changes_detected to True by user request - this will force S3 uploads even if no changes are present")
