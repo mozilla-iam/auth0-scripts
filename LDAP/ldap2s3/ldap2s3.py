@@ -42,6 +42,8 @@ class ldaper():
         self.cis_config = cis_config
         self.connect(uri, user, password)
         self.cache = cache
+        u = cis_profile.User()
+        self.cis_profile_schema_cache = u.get_schema()
 
     def user_from_cache(self, user_dn):
         try:
@@ -119,11 +121,12 @@ class ldaper():
 
         # if we have cache, use it
         # else, use a new empty user profile
+        # always use schema cache, though, since we loaded it in __init__()
         cached_user = self.user_from_cache(dn)
         if (len(cached_user) > 1):
-            user = cis_profile.User(user_structure_json=cached_user)
+            user = cis_profile.User(user_structure_json=cached_user, schema=self.cis_profile_schema_cache)
         else:
-            user = cis_profile.User()
+            user = cis_profile.User(schema=self.cis_profile_schema_cache)
 
         # Insert LDAP email as primary email
         user.primary_email.value = self.gfe(attrs, 'mail')
