@@ -7,7 +7,6 @@ python2_detected = False
 
 import argparse
 import boto3
-from datetime import datetime
 import json
 from ldap3 import Server, Connection, SUBTREE
 try:
@@ -16,6 +15,7 @@ except ImportError:
     import backports.lzma as lzma
     python2_detected = True
 import logging
+import cis_profile
 import os
 import yaml
 import sys
@@ -36,45 +36,21 @@ def setup_logging(stream=sys.stderr, level=logging.INFO):
     return logger
 
 
-class DotDict(dict):
-    """
-    dict.item notation for dict()'s
-    """
-    __getattr__ = dict.__getitem__
-    __setattr__ = dict.__setitem__
-    __delattr__ = dict.__delitem__
-
-    def __init__(self, dct):
-        for key, value in dct.items():
-            if hasattr(value, 'keys'):
-                value = DotDict(value)
-            self[key] = value
-
-    def __getstate__(self):
-        return self.__dict__
-
-
 class ldaper():
-    def __init__(self, uri, user, password, cis_config):
+    def __init__(self, uri, user, password, cis_config, cache):
         global logger
-        # This could use the IAM profile eventually if we wanted, with schema validation
-        # That said for now we only care about groups
-
-        # Read the user profile in a string but don't parse it yet to avoid having
-        # To copy a bunch of dicts, which would cause MemoryError exceptions
-        profile_file = cis_config.skeleton
-        try:
-            with open(profile_file) as fd:
-                self.userprofile_json = fd.read()
-        except FileNotFoundError:
-            logger.critical("FATAL: Could not find default profile file: {}. Please check configuration."
-                            .format(profile_file))
-            sys.exit(127)
-            return # Not reached
-
         self.cis_config = cis_config
-
         self.connect(uri, user, password)
+        self.cache = cache
+        u = cis_profile.User()
+        self.cis_profile_schema_cache = u.get_schema()
+
+    def user_from_cache(self, user_dn):
+        try:
+            user_cached = self.cache[user_dn]
+        except KeyError:
+            user_cached = None
+        return user_cached
 
     def connect(self, uri, user, password):
         server = Server(uri)
@@ -104,7 +80,8 @@ class ldaper():
         myval = data.get(val)
         if type(myval) is list:
             if len(myval) == 0:
-                logger.debug('Missing required attribute during conversion of "{}": {}'.format(data, myval))
+                # This happens too often to even print in debug, but if you need it, its there
+                #logger.debug('Missing required attribute during conversion of "{}": {}'.format(data, myval))
                 return None
             myval = myval[0]
 
@@ -134,101 +111,143 @@ class ldaper():
 
         return ret
 
-    def validate_user(self, user_profile):
-        """
-        Validate a user profile against CIS profile
-        Returns True if the profile validate, False if not.
-        @user_profile: dict
-        """
-        schema_file = self.cis_config.schema
-        try:
-            with open(schema_file) as fd:
-                schema = json.load(fd)
-        except FileNotFoundError:
-            return False
-
-        try:
-            jsonschema.validate(user_profile, schema)
-            return True
-        except jsonschema.exceptions.ValidationError:
-            return False
-
     def user(self, entry):
         """
         Finds canonical LDAP data for that user
         """
-        user = DotDict(json.loads(self.userprofile_json))
-
-        # Add LDAP attributes
+        # Get LDAP attributes we'll work on + dn
         attrs = entry.get('raw_attributes')
         dn = self.gfe(entry, 'raw_dn')
 
-        # Insert LDAP email as primary email
-        user.primaryEmail = self.gfe(attrs, 'mail')
-        email = {
-                  'value': user.primaryEmail,
-                  'verified': True,
-                  'primary': True,
-                  'name': 'LDAP-imported Email'
-                }
-        user.emails.append(email)
+        # if we have cache, use it
+        # else, use a new empty user profile
+        # always use schema cache, though, since we loaded it in __init__()
+        cached_user = self.user_from_cache(dn)
+        if (len(cached_user) > 1):
+            user = cis_profile.User(user_structure_json=cached_user, schema=self.cis_profile_schema_cache)
+        else:
+            user = cis_profile.User(schema=self.cis_profile_schema_cache)
 
-        if not user.primaryEmail or not dn:
-            logger.warning('Invalid user specification dn: {} mail: {}'.format(dn, user.primaryEmail))
+        # Insert LDAP email as primary email
+        user.primary_email.value = self.gfe(attrs, 'mail')
+        if not user.primary_email.value or not dn:
+            logger.warning('Invalid user specification dn: {} mail: {}'.format(dn, user.primary_email.value))
+
+        # LDAP is our reserved key
+        user.identities['values']['LDAP'] = user.primary_email.value
+
+        # Login method
+        user.login_method.value = self.cis_config.connection
 
         # Terrible hack to emulate the LDAP user_id
         # This NEEDS to match Auth0 LDAP user_ids
         # XXX Replace this by opaque UUIDs someday, as well as in the Auth0 LDAP Connector
-        user.userName = self.gfe(attrs, 'uid')
-        user.user_id = "{}|{}".format(self.cis_config.user_id_prefix, user.userName)
+        ldap_user_uid = self.gfe(attrs, 'uid')
+        user.usernames['values']['LDAP'] = ldap_user_uid
+        user.user_id['value'] = "{}|{}".format(self.cis_config.user_id_prefix, ldap_user_uid)
+
+        n = 0
+        for alias in attrs.get('zimbraAlias'):
+            n = n + 1
+            alias_dec = alias.decode('utf-8')
+            user.identities['values']['LDAP-alias-{}'.format(n)] = alias_dec
 
         # SSH Key
+        # Named: "LDAP-1" "LDAP-2", etc.
+        n = 0
         for k in self.normalize_ssh(attrs.get('sshPublicKey')):
-            sshkey = {
-                      'value': k,
-                      'verified': False,
-                      'primary': True,
-                      'name': 'LDAP-imported SSH Public key'
-                     }
-            user.SSHFingerprints.append(sshkey)
+            n = n + 1
+            user.ssh_public_keys['values']['LDAP-{}'.format(n)] = k
 
         # PGP Key
+        # Same naming format as SSH
+        n = 0
         for k in self.normalize_pgp(attrs.get('pgpFingerprint')):
-            pgpkey = {
-                      'value': k,
-                      'verified': False,
-                      'primary': True,
-                      'name': 'LDAP-imported PGP Public key'
-                     }
-            user.PGPFingerprints.append(pgpkey)
+            n = n +1
+            user.pgp_public_keys['values']['LDAP-{}'.format(n)] = k
 
         # Phone numbers - note, its not in "telephoneNumber" which is only an extension for VOIP
         phones = attrs.get('mobile')
+        n = 0
         for p in phones:
-            user.phoneNumbers.append(p.decode('utf-8'))
+            n = n + 1
+            user.phone_numbers['values']['LDAP-{}'.format(n)] = p.decode('utf-8')
 
         # Names
-        user.firstName = self.gfe(attrs, 'givenName')
-        user.lastName = self.gfe(attrs, 'sn')
-        user.displayName = u"{} {}".format(user.firstName, user.lastName)
+        user.first_name['value'] = self.gfe(attrs, 'givenName')
+        user.last_name['value'] = self.gfe(attrs, 'sn')
+        alternative_name = self.gfe(attrs, 'displayName')
+        if alternative_name is not None:
+            user.alternative_name['value'] = alternative_name
 
-        # Times - Profile output format is 2017-03-09T21:28:51.851Z
-        dt = entry.get('attributes').get('createTimestamp')
-        created = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
-        user.created = created
+        # Fun title
+        user.fun_title.value = self.gfe(attrs, 'title')
 
-        dt = entry.get('attributes').get('modifyTimestamp')
-        lastModified = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
-        user.lastModified = lastModified
+        # Usernames
+        ## Unix id / "posix uid" i.e. usernames and their declared integer (eg kang: 1000)
+        unix_id = self.gfe(attrs, 'uid')
+        unix_uid_int = self.gfe(attrs, 'uidNumber')
+        if unix_id is not None:
+            user.usernames['values'] = {'LDAP-posix_id': unix_id, 'LDAP-posix_uid': unix_uid_int}
+        # other nick/usernames, unverified
+        n = 0
+        for im_name in attrs.get('im'):
+            n = n + 1
+            user.usernames['values']['LDAP-im-unverified-{}'.format(n)] = im_name.decode('utf-8')
 
-        return (dn, user)
+        # Description / free form text from the user
+        description = self.gfe(attrs, 'description')
+        user.description.value = description
+
+        # Picture - this takes an URI so we're technically correct here, though this isn't exactly useable by all
+        # as you need to be able to address the picture URI
+        picture = attrs.get('jpegPhoto')
+        if picture is not None and len(picture) > 0:
+            picture_path = "{}/{}.jpg".format(self.cis_config.local_pictures_folder, user.user_id.value)
+            #save picture to disk
+            with open(picture_path, 'w') as fd:
+                fd.write(picture[0])
+            picture_uri = "file:///{}".format(picture_path)
+            user.picture.value = picture_uri
+
+        # Check if the created user is different from cache, if not, just use the cache
+        # If yes, update timestamps, sign values, validate and replace cache (the sign operation takes significant CPU resources)
+        if user.as_dict() == cached_user:
+            dict_user = cached_user
+        else:
+            logger.debug("Cache miss, updating and signing new user data for {}".format(dn))
+            # Times - Profile output format is 2017-03-09T21:28:51.851Z
+            dt = entry.get('attributes').get('createTimestamp')
+            created = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
+            user.created['value'] = created
+
+            dt = entry.get('attributes').get('modifyTimestamp')
+            last_modified = dt.strftime('%Y-%m-%dT:%H:%M:%SZ')
+            user.last_modified.value = last_modified
+
+            try:
+                user.sign_all()
+            except Exception as e:
+                logger.critical("Profile data signing failed for user {} - skipped signing, verification WILL "
+                                "FAIL".format(dn))
+
+            # Validate user is correct
+            try:
+                validation = user.validate()
+            except Exception as e:
+                logger.critical("Profile schema validation failed for user {} - skipped".format(dn))
+                logger.debug("validation data: {}".format(e))
+
+            dict_user = user.as_dict()
+
+        return (dn, dict_user)
 
     def group(self, entry):
         # Note we cannot rely on the mail= part of the dn here, so we don't
         """
         Finds canonical LDAP data for that group
         """
-        group = DotDict(dict())
+        group = cis_profile.DotDict()
         attrs = entry.get('raw_attributes')
         group.name = self.gfe(attrs, 'cn')
         group.members = []
@@ -241,6 +260,21 @@ class ldaper():
         return group
 
 
+def cache_load(cache_path):
+    cached = {}
+    try:
+        with open(cache_path, 'r') as fd:
+            cached = json.load(fd)
+    except FileNotFoundError:
+        logger.debug("No existing cache found")
+
+    return cached
+
+def cache_write(cache_path, data):
+    with open(cache_path, 'wb') as fd:
+        fd.write(data)
+
+
 if __name__ == "__main__":
     global logger
     os.environ['TZ'] = 'UTC' # Override timezone so we know where we're at
@@ -249,16 +283,18 @@ if __name__ == "__main__":
     parser.add_argument('-d', '--debug', action="store_true", help='Turns on debug logging')
     parser.add_argument('-f', '--force', action="store_true", help='Force sending to S3 even if there was no change detected')
     parser.add_argument('-s', '--sends3', action="store_true", help='Sends results to AWS S3 as lzma\'d JSON')
+    parser.add_argument('-p', '--sends3pictures', action="store_true", help='Gets & sends user pictures to AWS S3 as well, in jpeg (this is a lot more data)')
     args = parser.parse_args()
     if args.debug:
         logger = setup_logging(level=logging.DEBUG)
     else:
         logger = setup_logging(level=logging.INFO)
     with open(args.config or 'ldap2s3.yml') as fd:
-        config = DotDict(yaml.load(fd))
+        config = cis_profile.DotDict(yaml.load(fd))
 
-
-    mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis)
+    # Load any existing cached data we can use
+    cached = cache_load(config.aws.s3.cache)
+    mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis, cached)
 
     # List all groups
     groups = {}
@@ -270,33 +306,43 @@ if __name__ == "__main__":
         g = mozldap.group(entry)
         groups[g.name] = g.members
 
-    # Find user emails for all users
+    # Find user emails for all users - attributes_to_get are what's actually queried from LDAP
+    # See `def user` for how they're parsed and mapped to the IAM profiles
+    #
+    # zimbraAlias is a list of admin-provided email aliases for the users. The name is historical.
+    # im is a list of instant messaging nicknames, usually irc
+    # jpegPhoto is raw jpeg data
+    # displayName is a custom name (unlike givenName, sn)
+    # uid is the posix uid and uidNumber is the posix uid's integer
+    # title is an unofficial title set by the user
     users = {}
+    attributes_to_get =  ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
+                          'givenName', 'mobile', 'uid', 'uidNumber',
+                          'createTimestamp', 'modifyTimestamp',
+                          'im', 'displayName', 'title',
+                          'description', 'zimbraAlias']
+    if args.sends3pictures:
+        attributes_to_get.append('jpegPhoto')
+
+    # Lookup all entries in LDAP
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
-                                                     attributes = ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
-                                                                   'givenName', 'mobile', 'uid',
-                                                                   'createTimestamp', 'modifyTimestamp'],
-                                                     search_scope=SUBTREE, paged_size=10, generator=True)
+                                                     attributes = attributes_to_get,
+                                                     search_scope=SUBTREE, paged_size=100, generator=True)
     # Create the list of all users
     for entry in sgen:
+        # This returns a dn + dict (not JSON)
         dn, u = mozldap.user(entry)
         users[dn] = u
+        logger.debug("Processed user {}".format(dn))
 
     # Find which group belongs to which users and add them
     set_userskey = set(users.keys())
     for group in groups:
         uing = set(groups[group]) & set_userskey
         for u in uing:
-            users[u]['groups'].append(group)
-
-    logger.debug('Resulting group list:')
-    logger.debug(json.dumps(users))
-
-    # Validate all user profiles, warn strongly on failure
-    for u in users:
-        if not mozldap.validate_user(users[u]):
-            logger.critical("Profile schema validation failed for user {} - skipped".format(u))
+            # 'null' indicates a new group with no specific value attached to it (ie the group exists)
+            users[u]['access_information']['ldap']['values'][group] = None
 
     # Flatten our list of users into a single json string
     # So this may look a little weird here, let me explain:
@@ -316,23 +362,15 @@ if __name__ == "__main__":
 
     # Compare with cache
     changes_detected = True # Default to "we have changes" in case cache does not exist
-    try:
-        with open(config.aws.s3.cache, 'r') as fd:
-            cached = json.load(fd)
-            if (sorted(cached.items()) == sorted(users.items())):
-                logger.debug("No change detected since last run - won't upload to S3")
-                changes_detected = False
-            else:
-                logger.debug("Changes have been detected since last run")
-                changes_detected = True
-    except FileNotFoundError:
-        logger.debug("No cache found, interpreting result as: changes are detected")
+    if len(cached) > 1:
+        if (sorted(cached.items()) == sorted(users.items())):
+            logger.debug("No change detected since last run - won't upload to S3")
+            changes_detected = False
 
     # Write new version to cache
     if changes_detected:
-        with open(config.aws.s3.cache, 'wb') as fd:
-            fd.write(userlist_json_str)
-            logger.debug("Updated cache")
+        cache_write(config.aws.s3.cache, userlist_json_str)
+        logger.debug("Updated cache")
 
     if args.force:
         logger.warning("Forcing changes_detected to True by user request - this will force S3 uploads even if no changes are present")
@@ -349,3 +387,15 @@ if __name__ == "__main__":
         # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
         xz = lzma.compress(userlist_json_str)
         s3.put_object(Bucket=config.aws.s3.bucket, Key=config.aws.s3.filename, Body=xz)
+        if args.sends3pictures:
+            # also send pictures
+            logger.debug('Sending pictures to AWS S3 from directory {}'.format(config.cis.local_pictures_folder))
+            for picture in os.listdir(config.cis.local_pictures_folder):
+                p = '{}/{}'.format(config.cis.local_pictures_folder, picture)
+                if os.path.isfile(p):
+                    with open(p, 'r') as fd:
+                        picture_data = fd.read()
+                    x=s3.put_object(Bucket=config.aws.s3.bucket,
+                                  Key='{}/{}'.format(config.aws.s3.pictures_folder, picture),
+                                  Body=picture_data
+                                 )
