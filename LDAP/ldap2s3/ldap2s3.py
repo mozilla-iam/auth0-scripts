@@ -123,7 +123,7 @@ class ldaper():
         # else, use a new empty user profile
         # always use schema cache, though, since we loaded it in __init__()
         cached_user = self.user_from_cache(dn)
-        if (len(cached_user) > 1):
+        if (cached_user is not None and len(cached_user) > 1):
             user = cis_profile.User(user_structure_json=cached_user, schema=self.cis_profile_schema_cache)
         else:
             user = cis_profile.User(schema=self.cis_profile_schema_cache)
