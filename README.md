@@ -16,3 +16,6 @@ Automatically set Auth0 'ad' (LDAP) accounts to blocked ('disabled') if they are
 
 ### ldap2s3
 Uploads LDAP user profile data to an S3 bucket This allows easy access to user profiles in AWS, for example, for CIS.
+
+### clearpass_disable_accounts.py
+Automatically deletes users in Clearpass API (wifi) if they are disabled in LDAP or not part of the right group.
