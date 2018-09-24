@@ -11,6 +11,7 @@
         "mail_attribute": "",
         "alias_attribute": "",
         "disabled_query": "employeeType=DISABLED",
+        "clearpass_group_query": "",
         "ldap_domains": [
             "example.com",
             "example2.com"
@@ -22,6 +23,12 @@
             "http": "http://proxy.dmz.scl3.mozilla.com:3128",
             "https": "http://proxy.dmz.scl3.mozilla.com:3128"
         }
+    },
+    "clearpass_config": {
+      "uri": "https://clearpass.mozilla.net/api/",
+      "client_id": "",
+      "client_secret": "",
+      "role_filter": "[Employee]"
     },
     "disable_deactivated_accounts_config": {
         "exclusion_list": [

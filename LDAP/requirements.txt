@@ -1,0 +1,8 @@
+certifi==2018.8.24
+chardet==3.0.4
+idna==2.7
+ldap==1.0.2
+ldap3==2.5.1
+pyasn1==0.4.4
+requests==2.19.1
+urllib3==1.23
