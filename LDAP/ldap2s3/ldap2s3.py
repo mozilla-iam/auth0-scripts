@@ -1,31 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-# Ah, python2.
-global python2_detected
-python2_detected = False
-
 import argparse
 import boto3
 import json
 from ldap3 import Server, Connection, SUBTREE
-try:
-    import lzma
-except ImportError:
-    import backports.lzma as lzma
-    python2_detected = True
+import lzma
 import logging
 import cis_profile
 import os
 import yaml
 import sys
 import jsonschema
-
-try:
-    FileNotFoundError
-except NameError:
-    python2_detected = True
-    FileNotFoundError = IOError
 
 
 def setup_logging(stream=sys.stderr, level=logging.INFO):
@@ -206,7 +192,7 @@ class ldaper():
             picture_path = "{}/{}.jpg".format(self.cis_config.local_pictures_folder, user.user_id.value)
             #save picture to disk
             with open(picture_path, 'w') as fd:
-                fd.write(picture[0].encode())
+                fd.write(str(picture[0]))
             picture_uri = "file:///{}".format(picture_path)
             user.picture.value = picture_uri
 
@@ -345,20 +331,8 @@ if __name__ == "__main__":
             users[u]['access_information']['ldap']['values'][group] = None
 
     # Flatten our list of users into a single json string
-    # So this may look a little weird here, let me explain:
-    # first, we tell json that we want the 'utf8' encoding. That's because python2 will understand that as actual
-    # unicode (utf-8, even). But json has a hardcoded check for 'utf-8' (notice the '-') which doesn't do what you'd
-    # expect. This hardcoded check is bypassed since it won't match 'utf8' (no '-')
-    # Together with `ensure_ascii=False` this will take the correct code path to return a utf-8 string.
-    # Note that because it may also return a non-unicode string if there were no ascii characters found, we also
-    # re-encode to utf-8 *again* so that we pass a unicode string back for sure.
-    # Finally note that python3's version of json does not have this issue!
-    #
     # See also https://stackoverflow.com/questions/18990021/why-python-json-dumps-complains-about-ascii-decoding/50144465
-    if python2_detected:
-        userlist_json_str = json.dumps(users, encoding="utf8", ensure_ascii=False).encode('utf-8')
-    else:
-        userlist_json_str = json.dumps(users, ensure_ascii=False).encode('utf-8')
+    userlist_json_str = json.dumps(users, ensure_ascii=False).encode('utf-8')
 
     # Compare with cache
     changes_detected = True # Default to "we have changes" in case cache does not exist
