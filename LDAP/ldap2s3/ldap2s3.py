@@ -206,7 +206,7 @@ class ldaper():
             picture_path = "{}/{}.jpg".format(self.cis_config.local_pictures_folder, user.user_id.value)
             #save picture to disk
             with open(picture_path, 'w') as fd:
-                fd.write(picture[0])
+                fd.write(picture[0].encode())
             picture_uri = "file:///{}".format(picture_path)
             user.picture.value = picture_uri
 
