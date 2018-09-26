@@ -229,7 +229,7 @@ class ldaper():
                 user.sign_all()
             except Exception as e:
                 logger.critical("Profile data signing failed for user {} - skipped signing, verification WILL "
-                                "FAIL".format(dn))
+                                "FAIL ({})".format(dn, e))
 
             # Validate user is correct
             try:
