@@ -177,7 +177,7 @@ def main(prog_args=None):
                and (clearpass_username not in disable_deactivated_accounts_config['exclusion_list']):
                 print("Disabling clearpass (wifi) for {user}, ID: {userid}".format(user=clearpass_username, userid=clearpass_uid))
                 if not opt.debug:
-                    clearpass_client.remove_user(identity)
+                    clearpass_client.remove_user(clearpass_uid)
 
 if __name__ == "__main__":
     main()
