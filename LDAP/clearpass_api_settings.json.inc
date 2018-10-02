@@ -5,7 +5,7 @@
         "ldap_host": "",
         "mail_attribute": "mail",
         "disabled_query": "employeeType=DISABLED",
-        "clearpass_group_query": "(|(cn=team_moco)(cn=team_mofo)(cn=moco_wifi_non_staff))"
+        "clearpass_group_query": "(|(cn=team_moco)(cn=team_mofo)(cn=wifi_non_staff))"
     },
     "proxy_config": {
         "use_proxy": false,
