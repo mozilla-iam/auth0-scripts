@@ -152,6 +152,7 @@ def main(prog_args=None):
     blocked_users = list_blocked_users(all_users)
 
     ldap_conn = ldap.initialize('ldap://%s' % ldap_config['ldap_host'])
+    ldap_conn.start_tls_s()
     ldap_conn.simple_bind_s(ldap_config['ldap_user'], ldap_config['ldap_pass'])
 
     for user in active_users:
