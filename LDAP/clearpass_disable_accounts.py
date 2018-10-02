@@ -41,11 +41,11 @@ def get_ldap_user_by_mail(conn, mail, group_members, debug):
             if member[0][1]['mail'][0]:
                 if member[0][0] in group_members:
                     if debug:
-                        print "%s is active and in an allowed group" % (mail)
+                        print "    %s is active and in an allowed group" % (mail)
                     return True
                 else:
                     if debug:
-                        print "%s is active and but not in an allowed group" % (mail)
+                        print "    %s is active but not in an allowed group" % (mail)
                     return False
             else:
                 if debug:
@@ -112,15 +112,14 @@ class Clearpass(object):
         """
         See https://clearpass.mozilla.net/api/apigility/swagger/Identity-v1 (LocalUser delete by user id)
         """
-        payload = {'user_id': user_id}
-        r = requests.delete('{}{}'.format(self.uri, 'local-user'),
+        r = requests.delete('{}local-user/{}'.format(self.uri, user_id),
                 headers=self.build_headers(),
-                params=payload,
                 proxies=self.proxies)
         if not r.ok:
-            print(r.text)
+            print(r.text, r.url)
             raise Exception('RequestDeleteFailed', r.reason)
-        return r.json()
+        # Note: API does not confim deletion other than by code
+        return True
 
 # main function with logic to get all the active users in clearpass, check if they exist in LDAP and not disabled, then disable if not found
 # note that a user that does not exist in LDAP is equivalent to a user that is DISABLED in LDAP, due to ACLs. This cannot be distinguished without special permissions
@@ -158,7 +157,7 @@ def main(prog_args=None):
 
     for user in active_users:
         if opt.debug:
-            print("Verifying user", user['username'])
+            print "Verifying user %s" % (user['username'])
         try:
             #clearpass_username is an email
             clearpass_username = user.get(u'username')
