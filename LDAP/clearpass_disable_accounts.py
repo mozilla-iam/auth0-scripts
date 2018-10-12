@@ -158,10 +158,10 @@ def main(prog_args=None):
 
     for user in active_users:
         if opt.debug:
-            print("Verifying user", user['username'])
+            print("Verifying user", user['user_id'])
         try:
             #clearpass_username is an email
-            clearpass_username = user.get(u'username')
+            clearpass_username = user.get(u'user_id')
             clearpass_email_domain = clearpass_username.split('@')[1]
         except (KeyError, AttributeError):
             print("Cannot get email attributes for user", user)
