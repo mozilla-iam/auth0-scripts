@@ -45,7 +45,7 @@ class ldaper():
             logger.warning('Anonymous bind failed, cannot connect to the LDAP server')
             raise Exception(AnonymousBindFailed)
         if not conn.start_tls():
-            logger.warning('Could not negociate TLS connection with the LDAP server')
+            logger.warning('Could not negotiate TLS connection with the LDAP server')
             raise Exception(StartTlsFailed)
 
         if not conn.rebind(user, password):
