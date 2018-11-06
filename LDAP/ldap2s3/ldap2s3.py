@@ -29,7 +29,6 @@ class ldaper():
         self.connect(uri, user, password)
         self.cache = cache
         u = cis_profile.User()
-        self.cis_profile_schema_cache = u.get_schema()
 
     def user_from_cache(self, user_dn):
         try:
@@ -110,9 +109,9 @@ class ldaper():
         # always use schema cache, though, since we loaded it in __init__()
         cached_user = self.user_from_cache(dn)
         if (cached_user is not None and len(cached_user) > 1):
-            user = cis_profile.User(user_structure_json=cached_user, schema=self.cis_profile_schema_cache)
+            user = cis_profile.User(user_structure_json=cached_user)
         else:
-            user = cis_profile.User(schema=self.cis_profile_schema_cache)
+            user = cis_profile.User()
 
         # Insert LDAP email as primary email
         user.primary_email.value = self.gfe(attrs, 'mail')
@@ -120,7 +119,7 @@ class ldaper():
             logger.warning('Invalid user specification dn: {} mail: {}'.format(dn, user.primary_email.value))
 
         # LDAP is our reserved key
-        user.identities['values']['LDAP'] = user.primary_email.value
+        user.identities['mozilla_ldap_id']['value'] = user.primary_email.value
 
         # Login method
         user.login_method.value = self.cis_config.connection
@@ -129,18 +128,19 @@ class ldaper():
         # This NEEDS to match Auth0 LDAP user_ids
         # XXX Replace this by opaque UUIDs someday, as well as in the Auth0 LDAP Connector
         ldap_user_uid = self.gfe(attrs, 'uid')
-        user.usernames['values']['LDAP'] = ldap_user_uid
+        user.usernames['values'] = {'LDAP': ldap_user_uid}
         user.user_id['value'] = "{}|{}".format(self.cis_config.user_id_prefix, ldap_user_uid)
 
         n = 0
         for alias in attrs.get('zimbraAlias'):
             n = n + 1
             alias_dec = alias.decode('utf-8')
-            user.identities['values']['LDAP-alias-{}'.format(n)] = alias_dec
+            user.usernames['values']['LDAP-alias-{}'.format(n)] = alias_dec
 
         # SSH Key
         # Named: "LDAP-1" "LDAP-2", etc.
         n = 0
+        user.ssh_public_keys['values'] = {}
         for k in self.normalize_ssh(attrs.get('sshPublicKey')):
             n = n + 1
             user.ssh_public_keys['values']['LDAP-{}'.format(n)] = k
@@ -148,6 +148,7 @@ class ldaper():
         # PGP Key
         # Same naming format as SSH
         n = 0
+        user.pgp_public_keys['values'] = {}
         for k in self.normalize_pgp(attrs.get('pgpFingerprint')):
             n = n +1
             user.pgp_public_keys['values']['LDAP-{}'.format(n)] = k
@@ -155,6 +156,7 @@ class ldaper():
         # Phone numbers - note, its not in "telephoneNumber" which is only an extension for VOIP
         phones = attrs.get('mobile')
         n = 0
+        user.phone_numbers['values'] = {}
         for p in phones:
             n = n + 1
             user.phone_numbers['values']['LDAP-{}'.format(n)] = p.decode('utf-8')
@@ -175,6 +177,7 @@ class ldaper():
         unix_uid_int = self.gfe(attrs, 'uidNumber')
         if unix_id is not None:
             user.usernames['values'] = {'LDAP-posix_id': unix_id, 'LDAP-posix_uid': unix_uid_int}
+            user.identities['mozilla_posix_id']['value'] = unix_id
         # other nick/usernames, unverified
         n = 0
         for im_name in attrs.get('im'):
