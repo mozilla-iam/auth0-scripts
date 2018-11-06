@@ -23,9 +23,10 @@ def setup_logging(stream=sys.stderr, level=logging.INFO):
 
 
 class ldaper():
-    def __init__(self, uri, user, password, cis_config, cache):
+    def __init__(self, uri, user, password, cis_config, aws_config, cache):
         global logger
         self.cis_config = cis_config
+        self.aws_config = aws_config
         self.connect(uri, user, password)
         self.cache = cache
         u = cis_profile.User()
@@ -195,11 +196,16 @@ class ldaper():
         # as you need to be able to address the picture URI
         picture = attrs.get('jpegPhoto')
         if picture is not None and len(picture) > 0:
+            if not os.path.isdir(self.cis_config.local_pictures_folder):
+                os.makedirs(self.cis_config.local_pictures_folder)
+
             picture_path = "{}/{}.jpg".format(self.cis_config.local_pictures_folder, user.user_id.value)
             #save picture to disk
             with open(picture_path, 'w') as fd:
                 fd.write(str(picture[0]))
-            picture_uri = "file:///{}".format(picture_path)
+            picture_uri = "https://s3.amazonaws.com/{}/{}/{}.jpg".format(self.aws_config.s3.bucket,
+                                                                     self.aws_config.s3.pictures_folder,
+                                                                     user.user_id.value)
             user.picture.value = picture_uri
 
         # Check if the created user is different from cache, if not, just use the cache
@@ -286,7 +292,7 @@ if __name__ == "__main__":
 
     # Load any existing cached data we can use
     cached = cache_load(config.aws.s3.cache)
-    mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis, cached)
+    mozldap = ldaper(config.ldap.uri, config.ldap.user, config.ldap.password, config.cis, config.aws, cached)
 
     # List all groups
     groups = {}
