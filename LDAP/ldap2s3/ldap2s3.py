@@ -113,6 +113,9 @@ class ldaper():
         else:
             user = cis_profile.User()
 
+        # If we have a user, it's active
+        user.active.value = True
+
         # Insert LDAP email as primary email
         user.primary_email.value = self.gfe(attrs, 'mail')
         if not user.primary_email.value or not dn:
@@ -188,7 +191,7 @@ class ldaper():
         description = self.gfe(attrs, 'description')
         user.description.value = description
 
-        # Picture - this takes an URI so we're technically correct here, though this isn't exactly useable by all
+        # Picture - this takes an URI so we're technically correct here, though this isn't exactly usable by all
         # as you need to be able to address the picture URI
         picture = attrs.get('jpegPhoto')
         if picture is not None and len(picture) > 0:
