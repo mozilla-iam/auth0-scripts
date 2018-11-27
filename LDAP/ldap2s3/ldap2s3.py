@@ -382,7 +382,7 @@ if __name__ == "__main__":
             for picture in os.listdir(config.cis.local_pictures_folder):
                 p = '{}/{}'.format(config.cis.local_pictures_folder, picture)
                 if os.path.isfile(p):
-                    with open(p, 'r') as fd:
+                    with open(p, 'rb') as fd:
                         picture_data = fd.read()
                     x = s3.put_object(Bucket=config.aws.s3.bucket,
                                       Key='{}/{}'.format(config.aws.s3.pictures_folder, picture),
