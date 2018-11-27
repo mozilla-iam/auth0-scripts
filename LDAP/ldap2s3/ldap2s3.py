@@ -1,21 +1,20 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+from ldap3 import Server, Connection, SUBTREE, AnonymousBindFailed, StartTlsFailed, RebindFailed
 import argparse
 import boto3
 import json
-from ldap3 import Server, Connection, SUBTREE
 import lzma
 import logging
 import cis_profile
 import os
 import yaml
 import sys
-import jsonschema
 
 
 def setup_logging(stream=sys.stderr, level=logging.INFO):
-    formatstr="[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
+    formatstr = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
     logging.basicConfig(format=formatstr, datefmt="%H:%M:%S", stream=stream)
     logger = logging.getLogger(__name__)
     logger.setLevel(level)
@@ -29,7 +28,6 @@ class ldaper():
         self.aws_config = aws_config
         self.connect(uri, user, password)
         self.cache = cache
-        u = cis_profile.User()
 
     def user_from_cache(self, user_dn):
         try:
@@ -67,7 +65,7 @@ class ldaper():
         if type(myval) is list:
             if len(myval) == 0:
                 # This happens too often to even print in debug, but if you need it, its there
-                #logger.debug('Missing required attribute during conversion of "{}": {}'.format(data, myval))
+                # logger.debug('Missing required attribute during conversion of "{}": {}'.format(data, myval))
                 return None
             myval = myval[0]
 
@@ -154,7 +152,7 @@ class ldaper():
         n = 0
         user.pgp_public_keys['values'] = {}
         for k in self.normalize_pgp(attrs.get('pgpFingerprint')):
-            n = n +1
+            n = n + 1
             user.pgp_public_keys['values']['LDAP-{}'.format(n)] = k
 
         # Phone numbers - note, its not in "telephoneNumber" which is only an extension for VOIP
@@ -176,7 +174,7 @@ class ldaper():
         user.fun_title.value = self.gfe(attrs, 'title')
 
         # Usernames
-        ## Unix id / "posix uid" i.e. usernames and their declared integer (eg kang: 1000)
+        # Unix id / "posix uid" i.e. usernames and their declared integer (eg kang: 1000)
         unix_id = self.gfe(attrs, 'uid')
         unix_uid_int = self.gfe(attrs, 'uidNumber')
         if unix_id is not None:
@@ -200,16 +198,17 @@ class ldaper():
                 os.makedirs(self.cis_config.local_pictures_folder)
 
             picture_path = "{}/{}.jpg".format(self.cis_config.local_pictures_folder, user.user_id.value)
-            #save picture to disk
-            with open(picture_path, 'w') as fd:
-                fd.write(str(picture[0]))
+            # save picture to disk
+            with open(picture_path, 'wb') as fd:
+                fd.write(picture[0])
             picture_uri = "https://s3.amazonaws.com/{}/{}/{}.jpg".format(self.aws_config.s3.bucket,
-                                                                     self.aws_config.s3.pictures_folder,
-                                                                     user.user_id.value)
+                                                                         self.aws_config.s3.pictures_folder,
+                                                                         user.user_id.value)
             user.picture.value = picture_uri
 
         # Check if the created user is different from cache, if not, just use the cache
-        # If yes, update timestamps, sign values, validate and replace cache (the sign operation takes significant CPU resources)
+        # If yes, update timestamps, sign values, validate and replace cache
+        # (the sign operation takes significant CPU resources)
         if user.as_dict() == cached_user:
             dict_user = cached_user
         else:
@@ -231,7 +230,7 @@ class ldaper():
 
             # Validate user is correct
             try:
-                validation = user.validate()
+                user.validate()
             except Exception as e:
                 logger.critical("Profile schema validation failed for user {} - skipped".format(dn))
                 logger.debug("validation data: {}".format(e))
@@ -268,6 +267,7 @@ def cache_load(cache_path):
 
     return cached
 
+
 def cache_write(cache_path, data):
     with open(cache_path, 'wb') as fd:
         fd.write(data)
@@ -275,13 +275,15 @@ def cache_write(cache_path, data):
 
 if __name__ == "__main__":
     global logger
-    os.environ['TZ'] = 'UTC' # Override timezone so we know where we're at
+    os.environ['TZ'] = 'UTC'  # Override timezone so we know where we're at
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', help='Specify a configuration file')
     parser.add_argument('-d', '--debug', action="store_true", help='Turns on debug logging')
-    parser.add_argument('-f', '--force', action="store_true", help='Force sending to S3 even if there was no change detected')
+    parser.add_argument('-f', '--force', action="store_true", help='Force sending to S3 even if there was no '
+                        'change detected')
     parser.add_argument('-s', '--sends3', action="store_true", help='Sends results to AWS S3 as lzma\'d JSON')
-    parser.add_argument('-p', '--sends3pictures', action="store_true", help='Gets & sends user pictures to AWS S3 as well, in jpeg (this is a lot more data)')
+    parser.add_argument('-p', '--sends3pictures', action="store_true", help='Gets & sends user pictures to AWS S3 '
+                        'as well, in jpeg (this is a lot more data)')
     args = parser.parse_args()
     if args.debug:
         logger = setup_logging(level=logging.DEBUG)
@@ -298,7 +300,7 @@ if __name__ == "__main__":
     groups = {}
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.groups,
                                                      search_filter=config.ldap.filter.groups,
-                                                     attributes = ['cn', 'member'],
+                                                     attributes=['cn', 'member'],
                                                      search_scope=SUBTREE, paged_size=10, generator=True)
     for entry in sgen:
         g = mozldap.group(entry)
@@ -314,18 +316,18 @@ if __name__ == "__main__":
     # uid is the posix uid and uidNumber is the posix uid's integer
     # title is an unofficial title set by the user
     users = {}
-    attributes_to_get =  ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
-                          'givenName', 'mobile', 'uid', 'uidNumber',
-                          'createTimestamp', 'modifyTimestamp',
-                          'im', 'displayName', 'title',
-                          'description', 'zimbraAlias']
+    attributes_to_get = ['mail', 'sshPublicKey', 'pgpFingerprint', 'sn',
+                         'givenName', 'mobile', 'uid', 'uidNumber',
+                         'createTimestamp', 'modifyTimestamp',
+                         'im', 'displayName', 'title',
+                         'description', 'zimbraAlias']
     if args.sends3pictures:
         attributes_to_get.append('jpegPhoto')
 
     # Lookup all entries in LDAP
     sgen = mozldap.conn.extend.standard.paged_search(search_base=config.ldap.search_base.users,
                                                      search_filter=config.ldap.filter.users,
-                                                     attributes = attributes_to_get,
+                                                     attributes=attributes_to_get,
                                                      search_scope=SUBTREE, paged_size=100, generator=True)
     # Create the list of all users
     for entry in sgen:
@@ -343,11 +345,12 @@ if __name__ == "__main__":
             users[u]['access_information']['ldap']['values'][group] = None
 
     # Flatten our list of users into a single json string
-    # See also https://stackoverflow.com/questions/18990021/why-python-json-dumps-complains-about-ascii-decoding/50144465
+    # See also:
+    # https://stackoverflow.com/questions/18990021/why-python-json-dumps-complains-about-ascii-decoding/50144465
     userlist_json_str = json.dumps(users, ensure_ascii=False).encode('utf-8')
 
     # Compare with cache
-    changes_detected = True # Default to "we have changes" in case cache does not exist
+    changes_detected = True  # Default to "we have changes" in case cache does not exist
     if len(cached) > 1:
         if (sorted(cached.items()) == sorted(users.items())):
             logger.debug("No change detected since last run - won't upload to S3")
@@ -359,7 +362,8 @@ if __name__ == "__main__":
         logger.debug("Updated cache")
 
     if args.force:
-        logger.warning("Forcing changes_detected to True by user request - this will force S3 uploads even if no changes are present")
+        logger.warning("Forcing changes_detected to True by user request - this will force S3 uploads even if "
+                       "no changes are present")
         changes_detected = True
 
     # Dump all this to json => s3
@@ -368,8 +372,7 @@ if __name__ == "__main__":
         ses = boto3.Session(
                 aws_access_key_id=config.aws.boto.access_key_id,
                 aws_secret_access_key=config.aws.boto.secret_access_key)
-        s3 = ses.client('s3',
-                region_name=config.aws.boto.region)
+        s3 = ses.client('s3', region_name=config.aws.boto.region)
         # We xz compress and send a single file as its vastly faster than sending one file per user (1000x faster)
         xz = lzma.compress(userlist_json_str)
         s3.put_object(Bucket=config.aws.s3.bucket, Key=config.aws.s3.filename, Body=xz)
