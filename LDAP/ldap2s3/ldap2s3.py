@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from ldap3 import Server, Connection, SUBTREE, AnonymousBindFailed, StartTlsFailed, RebindFailed
+from ldap3 import Server, Connection, SUBTREE
 import argparse
 import boto3
 import json
@@ -41,14 +41,14 @@ class ldaper():
         conn = Connection(server)
         if not conn.bind():
             logger.warning('Anonymous bind failed, cannot connect to the LDAP server')
-            raise Exception(AnonymousBindFailed)
+            raise Exception("AnonymousBindFailed")
         if not conn.start_tls():
             logger.warning('Could not negotiate TLS connection with the LDAP server')
-            raise Exception(StartTlsFailed)
+            raise Exception("StartTlsFailed")
 
         if not conn.rebind(user, password):
             logger.warning("Rebind as privileged user failed")
-            raise Exception(RebindFailed)
+            raise Exception("RebindFailed")
 
         logger.debug(conn.extend.standard.who_am_i())
         logger.debug(conn)
