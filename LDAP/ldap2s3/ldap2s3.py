@@ -381,7 +381,6 @@ if __name__ == "__main__":
                 if os.path.isfile(p):
                     with open(p, 'r') as fd:
                         picture_data = fd.read()
-                    x=s3.put_object(Bucket=config.aws.s3.bucket,
-                                  Key='{}/{}'.format(config.aws.s3.pictures_folder, picture),
-                                  Body=picture_data
-                                 )
+                    x = s3.put_object(Bucket=config.aws.s3.bucket,
+                                      Key='{}/{}'.format(config.aws.s3.pictures_folder, picture),
+                                      Body=picture_data)
