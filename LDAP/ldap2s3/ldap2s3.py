@@ -213,6 +213,11 @@ class ldaper():
             dict_user = cached_user
         else:
             logger.debug("Cache miss, updating and signing new user data for {}".format(dn))
+            if ldap_user_uid is None:
+                # This shouldnt happen!
+                logger.critical("User does not have a uid in LDAP, something is wrong! dn: {}".format(dn))
+                return (dn, None)
+
             # Times - Profile output format is 2017-03-09T21:28:51.851Z
             dt = entry.get('attributes').get('createTimestamp')
             created = dt.strftime('%Y-%m-%dT:%H:%M:%S.000Z')
@@ -234,6 +239,7 @@ class ldaper():
             except Exception as e:
                 logger.critical("Profile schema validation failed for user {} - skipped".format(dn))
                 logger.debug("validation data: {}".format(e))
+                return (dn, None)
 
             dict_user = user.as_dict()
 
@@ -333,8 +339,9 @@ if __name__ == "__main__":
     for entry in sgen:
         # This returns a dn + dict (not JSON)
         dn, u = mozldap.user(entry)
-        users[dn] = u
-        logger.debug("Processed user {}".format(dn))
+        if u is not None:
+            users[dn] = u
+            logger.debug("Processed user {}".format(dn))
 
     # Find which group belongs to which users and add them
     set_userskey = set(users.keys())
