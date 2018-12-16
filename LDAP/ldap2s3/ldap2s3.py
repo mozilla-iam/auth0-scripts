@@ -228,7 +228,7 @@ class ldaper():
             user.last_modified.value = last_modified
 
             try:
-                user.sign_all()
+                user.sign_all(publisher_name='ldap')
             except Exception as e:
                 logger.critical("Profile data signing failed for user {} - skipped signing, verification WILL "
                                 "FAIL ({})".format(dn, e))
