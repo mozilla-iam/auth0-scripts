@@ -227,6 +227,9 @@ class ldaper():
             last_modified = dt.strftime('%Y-%m-%dT:%H:%M:%SZ')
             user.last_modified.value = last_modified
 
+            # Update all modified attributes timestamps
+            user.initialize_timestamps()
+
             try:
                 user.sign_all(publisher_name='ldap')
             except Exception as e:
@@ -236,6 +239,9 @@ class ldaper():
             # Validate user is correct
             try:
                 user.validate()
+                # This is a semi-hack (yeah!) which assumes we always publish new profiles. its not true, but we're not
+                # the actual publisher, and this will gets us most checks done. i.e. we verify against an empty profile.
+                user.verify_all_publishers(cis_profile.User())
             except Exception as e:
                 logger.critical("Profile schema validation failed for user {} - skipped".format(dn))
                 logger.debug("validation data: {}".format(e))
