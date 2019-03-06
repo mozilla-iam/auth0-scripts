@@ -114,25 +114,31 @@ class ldaper:
 
         # If we have a user, it's active
         user.active.value = True
+        user.active.signature.publisher.name = "ldap"
 
         # Insert LDAP email as primary email
         user.primary_email.value = self.gfe(attrs, "mail")
         if not user.primary_email.value or not dn:
             logger.warning("Invalid user specification dn: {} mail: {}".format(dn, user.primary_email.value))
         user.identities["mozilla_ldap_primary_email"]["value"] = user.primary_email.value
+        user.identities["mozilla_ldap_primary_email"]["signature"]["publisher"]["name"] = "ldap"
 
         # LDAP is our reserved key
         user.identities["mozilla_ldap_id"]["value"] = dn
+        user.identities["mozilla_ldap_id"]["signature"]["publisher"]["name"] = "ldap"
 
         # Login method
         user.login_method.value = self.cis_config.connection
+        user.login_method.signature.publisher.name = "ldap"
 
         # Terrible hack to emulate the LDAP user_id
         # This NEEDS to match Auth0 LDAP user_ids
         # XXX Replace this by opaque UUIDs someday, as well as in the Auth0 LDAP Connector
         ldap_user_uid = self.gfe(attrs, "uid")
         user.usernames["values"] = {"LDAP": ldap_user_uid}
+        user.usernames.signature.publisher.name = "ldap"
         user.user_id["value"] = "{}|{}".format(self.cis_config.user_id_prefix, ldap_user_uid)
+        user.user_id.signature.publisher.name = "ldap"
 
         n = 0
         for alias in attrs.get("zimbraAlias"):
@@ -144,6 +150,7 @@ class ldaper:
         # Named: "LDAP-1" "LDAP-2", etc.
         n = 0
         user.ssh_public_keys["values"] = {}
+        user.ssh_public_keys.signature.publisher.name = "ldap"
         for k in self.normalize_ssh(attrs.get("sshPublicKey")):
             n = n + 1
             user.ssh_public_keys["values"]["LDAP-{}".format(n)] = k
@@ -152,6 +159,7 @@ class ldaper:
         # Same naming format as SSH
         n = 0
         user.pgp_public_keys["values"] = {}
+        user.pgp_public_keys.signature.publisher.name = "ldap"
         for k in self.normalize_pgp(attrs.get("pgpFingerprint")):
             n = n + 1
             user.pgp_public_keys["values"]["LDAP-{}".format(n)] = k
@@ -160,18 +168,22 @@ class ldaper:
         phones = attrs.get("mobile")
         n = 0
         user.phone_numbers["values"] = {}
+        user.phone_numbers.signature.publisher.name = "ldap"
         for p in phones:
             n = n + 1
             user.phone_numbers["values"]["LDAP-{}".format(n)] = p.decode("utf-8")
 
         # Names
         user.first_name["value"] = self.gfe(attrs, "givenName")
+        user.first_name.signature.publisher.name = "ldap"
         user.last_name["value"] = self.gfe(attrs, "sn")
+        user.last_name.signature.publisher.name = "ldap"
         alternative_name = self.gfe(attrs, "displayName")
         if alternative_name is not None:
             user.alternative_name["value"] = alternative_name
 
         # Fun title
+        user.fun_title.signature.publisher.name = "ldap"
         user.fun_title.value = self.gfe(attrs, "title")
 
         # Usernames
@@ -181,6 +193,7 @@ class ldaper:
         if unix_id is not None:
             user.usernames["values"] = {"LDAP-posix_id": unix_id, "LDAP-posix_uid": unix_uid_int}
             user.identities["mozilla_posix_id"]["value"] = unix_id
+            user.identities["mozilla_posix_id"]["signature"]["publisher"]["name"] = "ldap"
         # other nick/usernames, unverified
         n = 0
         for im_name in attrs.get("im"):
@@ -190,6 +203,7 @@ class ldaper:
         # Description / free form text from the user
         description = self.gfe(attrs, "description")
         user.description.value = description
+        user.description.signature.publisher.name = "ldap"
 
         # Picture - this takes an URI so we're technically correct here, though this isn't exactly usable by all
         # as you need to be able to address the picture URI
@@ -206,6 +220,7 @@ class ldaper:
                 self.aws_config.s3.bucket, self.aws_config.s3.pictures_folder, user.user_id.value
             )
             user.picture.value = picture_uri
+            user.picture.signature.publisher.name = "ldap"
 
         # Check if the created user is different from cache, if not, just use the cache
         # If yes, update timestamps, sign values, validate and replace cache
@@ -223,10 +238,12 @@ class ldaper:
             dt = entry.get("attributes").get("createTimestamp")
             created = dt.strftime("%Y-%m-%dT:%H:%M:%S.000Z")
             user.created["value"] = created
+            user.created.signature.publisher.name = "ldap"
 
             dt = entry.get("attributes").get("modifyTimestamp")
             last_modified = dt.strftime("%Y-%m-%dT:%H:%M:%SZ")
             user.last_modified.value = last_modified
+            user.last_modified.signature.publisher.name = "ldap"
 
             # Update all modified attributes timestamps
             user.initialize_timestamps()
