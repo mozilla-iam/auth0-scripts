@@ -119,9 +119,10 @@ class ldaper:
         user.primary_email.value = self.gfe(attrs, "mail")
         if not user.primary_email.value or not dn:
             logger.warning("Invalid user specification dn: {} mail: {}".format(dn, user.primary_email.value))
+        user.identities["mozilla_ldap_primary_email"]["value"] = user.primary_email.value
 
         # LDAP is our reserved key
-        user.identities["mozilla_ldap_id"]["value"] = user.primary_email.value
+        user.identities["mozilla_ldap_id"]["value"] = dn
 
         # Login method
         user.login_method.value = self.cis_config.connection
@@ -382,6 +383,8 @@ if __name__ == "__main__":
         uing = set(groups[group]) & set_userskey
         for u in uing:
             # 'null' indicates a new group with no specific value attached to it (ie the group exists)
+            if users[u]["access_information"]["ldap"]["values"] is None:
+                users[u]["access_information"]["ldap"]["values"] = {}
             users[u]["access_information"]["ldap"]["values"][group] = None
 
     # Flatten our list of users into a single json string
