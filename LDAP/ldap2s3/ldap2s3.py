@@ -118,6 +118,7 @@ class ldaper:
 
         # Insert LDAP email as primary email
         user.primary_email.value = self.gfe(attrs, "mail")
+        user.primary_email.signature.publisher.name = "ldap"
         if not user.primary_email.value or not dn:
             logger.warning("Invalid user specification dn: {} mail: {}".format(dn, user.primary_email.value))
         user.identities["mozilla_ldap_primary_email"]["value"] = user.primary_email.value
