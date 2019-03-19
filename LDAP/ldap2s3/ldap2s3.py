@@ -442,7 +442,7 @@ if __name__ == "__main__":
         logger.debug("Updated cache")
 
     if args.force:
-        logger.warning(
+        logger.debug(
             "Forcing changes_detected to True by user request - this will force S3 uploads even if "
             "no changes are present"
         )
