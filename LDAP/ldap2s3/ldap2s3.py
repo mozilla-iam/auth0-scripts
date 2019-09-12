@@ -419,6 +419,7 @@ if __name__ == "__main__":
             if users[u]["access_information"]["ldap"]["values"] is None:
                 users[u]["access_information"]["ldap"]["values"] = {}
             users[u]["access_information"]["ldap"]["values"][group] = None
+            users[u]["access_information"]["ldap"]["metadata"]["display"] = "private"
             # XXX Quick fix to sign groups
             tmp_user = cis_profile.User(users[u])
             tmp_user.sign_attribute("access_information.ldap", publisher_name="ldap")
