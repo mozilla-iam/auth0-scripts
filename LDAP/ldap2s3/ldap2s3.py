@@ -102,6 +102,16 @@ class ldaper:
         # Get LDAP attributes we'll work on + dn
         attrs = entry.get("raw_attributes")
         dn = self.gfe(entry, "raw_dn")
+        try:
+            org = dn.split(",")[1]
+        except:
+            org = "o=com"
+
+        # These orgs are considered "staff LDAP" - other orgs are volunteers
+        if (org == "o=com") or org == ("o=org"):
+            display_default = "staff"
+        else:
+            display_default = "private"
 
         # if we have cache, use it
         # else, use a new empty user profile
@@ -119,12 +129,12 @@ class ldaper:
         # Insert LDAP email as primary email
         user.primary_email.value = self.gfe(attrs, "mail")
         user.primary_email.signature.publisher.name = "ldap"
-        user.primary_email.metadata.display = "staff"
+        user.primary_email.metadata.display = display_default
         if not user.primary_email.value or not dn:
             logger.warning("Invalid user specification dn: {} mail: {}".format(dn, user.primary_email.value))
         user.identities["mozilla_ldap_primary_email"]["value"] = user.primary_email.value
         user.identities["mozilla_ldap_primary_email"]["signature"]["publisher"]["name"] = "ldap"
-        user.identities["mozilla_ldap_primary_email"]["metadata"]["display"] = "staff"
+        user.identities["mozilla_ldap_primary_email"]["metadata"]["display"] = display_default
 
         # LDAP is our reserved key
         user.identities["mozilla_ldap_id"]["value"] = dn
@@ -141,7 +151,7 @@ class ldaper:
         ldap_user_uid = self.gfe(attrs, "uid")
         user.usernames["values"] = {"LDAP": ldap_user_uid}
         user.usernames.signature.publisher.name = "ldap"
-        user.usernames.metadata.display = "staff"
+        user.usernames.metadata.display = display_default
         user.user_id["value"] = "{}|{}".format(self.cis_config.user_id_prefix, ldap_user_uid)
         user.user_id.signature.publisher.name = "ldap"
 
@@ -156,7 +166,7 @@ class ldaper:
         n = 0
         user.ssh_public_keys["values"] = {}
         user.ssh_public_keys.signature.publisher.name = "ldap"
-        user.ssh_public_keys.metadata.display = "staff"
+        user.ssh_public_keys.metadata.display = display_default
         for k in self.normalize_ssh(attrs.get("sshPublicKey")):
             n = n + 1
             user.ssh_public_keys["values"]["LDAP-{}".format(n)] = k
@@ -166,7 +176,7 @@ class ldaper:
         n = 0
         user.pgp_public_keys["values"] = {}
         user.pgp_public_keys.signature.publisher.name = "ldap"
-        user.pgp_public_keys.metadata.display = "staff"
+        user.pgp_public_keys.metadata.display = display_default
         for k in self.normalize_pgp(attrs.get("pgpFingerprint")):
             n = n + 1
             user.pgp_public_keys["values"]["LDAP-{}".format(n)] = k
@@ -176,7 +186,7 @@ class ldaper:
         n = 0
         user.phone_numbers["values"] = {}
         user.phone_numbers.signature.publisher.name = "ldap"
-        user.phone_numbers.metadata.display = "staff"
+        user.phone_numbers.metadata.display = display_default
         for p in phones:
             n = n + 1
             user.phone_numbers["values"]["LDAP-{}".format(n)] = p.decode("utf-8")
@@ -184,20 +194,20 @@ class ldaper:
         # Names
         user.first_name["value"] = self.gfe(attrs, "givenName")
         user.first_name.signature.publisher.name = "ldap"
-        user.first_name.metadata.display = "staff"
+        user.first_name.metadata.display = display_default
         user.last_name["value"] = self.gfe(attrs, "sn")
         user.last_name.signature.publisher.name = "ldap"
-        user.last_name.metadata.display = "staff"
+        user.last_name.metadata.display = display_default
         alternative_name = self.gfe(attrs, "displayName")
         if alternative_name is not None:
             user.alternative_name["value"] = alternative_name
             user.alternative_name.signature.publisher.name = "ldap"
-            user.alternative_name.metadata.display = "staff"
+            user.alternative_name.metadata.display = display_default
 
         # Fun title
         user.fun_title.value = self.gfe(attrs, "title")
         user.fun_title.signature.publisher.name = "ldap"
-        user.fun_title.metadata.display = "staff"
+        user.fun_title.metadata.display = display_default
 
         # Usernames
         # Unix id / "posix uid" i.e. usernames and their declared integer (eg kang: 1000)
@@ -207,7 +217,7 @@ class ldaper:
             user.usernames["values"] = {"LDAP-posix_id": unix_id, "LDAP-posix_uid": unix_uid_int}
             user.identities["mozilla_posix_id"]["value"] = unix_id
             user.identities["mozilla_posix_id"]["signature"]["publisher"]["name"] = "ldap"
-            user.identities["mozilla_posix_id"]["metadata"]["display"] = "staff"
+            user.identities["mozilla_posix_id"]["metadata"]["display"] = display_default
         # other nick/usernames, unverified
         n = 0
         for im_name in attrs.get("im"):
@@ -218,7 +228,7 @@ class ldaper:
         description = self.gfe(attrs, "description")
         user.description.value = description
         user.description.signature.publisher.name = "ldap"
-        user.description.metadata.display = "staff"
+        user.description.metadata.display = display_default
 
         # Picture - this takes an URI so we're technically correct here, though this isn't exactly usable by all
         # as you need to be able to address the picture URI
@@ -236,7 +246,7 @@ class ldaper:
             )
             user.picture.value = picture_uri
             user.picture.signature.publisher.name = "ldap"
-            user.picture.metadata.display = "staff"
+            user.picture.metadata.display = display_default
 
         # Check if the created user is different from cache, if not, just use the cache
         # If yes, update timestamps, sign values, validate and replace cache
