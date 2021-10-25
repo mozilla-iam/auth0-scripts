@@ -1,3 +1,7 @@
+# DEPRECATION NOTICE
+
+*This repo is deprecated and all scripts within it have been migrated either to other repositories or to IT puppet.*
+
 # auth0-scripts
 Scripts to manage auth0 via API
 
