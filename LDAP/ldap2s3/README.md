@@ -1,3 +1,7 @@
+# DEPRECATION NOTICE
+
+*This script has been deprecated. This README is being left intact to support general discovery and decommisioning work.*
+
 # LDAP2S3
 
 This script queries and convert LDAP data from Mozilla LDAP's specific schema to JSON files that get stored in S3

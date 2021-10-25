@@ -34,7 +34,7 @@ modules/ldap_crons/templates/duo_assign_groups/duo_assign_groups_settings.json.e
 Automatically set Auth0 'ad' (LDAP) accounts to blocked ('disabled') if they are disabled in LDAP.
 
 ### ldap2s3
-Uploads LDAP user profile data to an S3 bucket This allows easy access to user profiles in AWS, for example, for CIS.
+Removed decommissioned ldap2s3; replaced by `ldap_to_cis` in IAM-858.
 
 ### clearpass_disable_accounts.py
 Automatically deletes users in Clearpass API (wifi) if they are disabled in LDAP or not part of the right group.
